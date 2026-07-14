@@ -1,6 +1,6 @@
 {
   "name": "@audio/decode-amr",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Decode AMR-NB/WB audio via opencore-amr WASM",
   "type": "module",
   "main": "decode-amr.js",
@@ -42,11 +42,11 @@
   },
   "license": "Apache-2.0",
   "author": "audiojs",
-  "homepage": "https://github.com/audiojs/decode-amr#readme",
-  "bugs": "https://github.com/audiojs/decode-amr/issues",
+  "homepage": "https://github.com/audiojs/decode/tree/master/packages/decode-amr#readme",
+  "bugs": "https://github.com/audiojs/decode/issues",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/audiojs/decode-amr.git",
+    "url": "git+https://github.com/audiojs/decode.git",
     "directory": "packages/decode-amr"
   },
   "engines": {

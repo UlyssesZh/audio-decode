@@ -1,6 +1,6 @@
 {
   "name": "@audio/decode-wav",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "Decode WAV audio to PCM samples",
   "type": "module",
   "main": "decode-wav.js",
@@ -41,6 +41,8 @@
     "url": "git+https://github.com/audiojs/decode.git",
     "directory": "packages/decode-wav"
   },
+  "homepage": "https://github.com/audiojs/decode/tree/master/packages/decode-wav#readme",
+  "bugs": "https://github.com/audiojs/decode/issues",
   "engines": {
     "node": ">=18"
   },

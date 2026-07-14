@@ -1,6 +1,6 @@
 {
   "name": "@audio/decode-webm",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Decode WebM audio (Opus, Vorbis) to PCM samples",
   "type": "module",
   "main": "decode-webm.js",
@@ -40,16 +40,16 @@
   },
   "license": "MIT",
   "author": "audiojs",
-  "homepage": "https://github.com/audiojs/decode-webm#readme",
+  "homepage": "https://github.com/audiojs/decode/tree/master/packages/decode-webm#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/audiojs/decode-webm.git",
+    "url": "git+https://github.com/audiojs/decode.git",
     "directory": "packages/decode-webm"
   },
   "engines": {
     "node": ">=18"
   },
-  "bugs": "https://github.com/audiojs/decode-webm/issues",
+  "bugs": "https://github.com/audiojs/decode/issues",
   "scripts": {
     "build": "bash build.sh",
     "prepack": "npm run build",

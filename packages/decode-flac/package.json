@@ -1,6 +1,6 @@
 {
   "name": "@audio/decode-flac",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Decode FLAC audio via libflac WASM — self-contained bundle",
   "type": "module",
   "main": "decode-flac.js",
@@ -40,12 +40,13 @@
   },
   "license": "MIT",
   "author": "audiojs",
-  "homepage": "https://github.com/audiojs/decode/tree/main/packages/decode-flac#readme",
+  "homepage": "https://github.com/audiojs/decode/tree/master/packages/decode-flac#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/audiojs/decode.git",
     "directory": "packages/decode-flac"
   },
+  "bugs": "https://github.com/audiojs/decode/issues",
   "dependencies": {
     "@wasm-audio-decoders/flac": "^0.2.10"
   },
