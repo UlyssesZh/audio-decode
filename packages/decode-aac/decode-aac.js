@@ -121,17 +121,23 @@ class AACDecoder {
 
 	_tryM4AInit() {
 		let buf = this._catAccum()
-		let asc = null, alacCookie = null, stsz = null, stco = null, stsc = null
+		// tables are collected per trak — a second non-audio track (e.g. a QuickTime
+		// chapter/text track, github #48) must not clobber the audio track's tables
+		let traks = [], t = null
 
 		parseBoxes(buf, 0, buf.length, (type, data) => {
-			if (type === 'esds') asc = parseEsds(data)
-			else if (type === 'alac') alacCookie = data // ALAC magic cookie: version/flags(4) + ALACSpecificConfig(24)
-			else if (type === 'stsz') stsz = parseStsz(data)
-			else if (type === 'stco') stco = parseStco(data)
-			else if (type === 'co64') stco = parseCo64(data)
-			else if (type === 'stsc') stsc = parseStsc(data)
+			if (type === 'trak') traks.push(t = {})
+			else if (!t) return
+			else if (type === 'esds') t.asc = parseEsds(data)
+			else if (type === 'alac') t.alacCookie = data // ALAC magic cookie: version/flags(4) + ALACSpecificConfig(24)
+			else if (type === 'stsz') t.stsz = parseStsz(data)
+			else if (type === 'stco') t.stco = parseStco(data)
+			else if (type === 'co64') t.stco = parseCo64(data)
+			else if (type === 'stsc') t.stsc = parseStsc(data)
 		})
 
+		// the audio track: first trak with an audio config + sample tables
+		let { asc, alacCookie, stsz, stco, stsc } = traks.find(t => (t.asc || t.alacCookie) && t.stsz && t.stco?.length) ?? {}
 		if ((!asc && !alacCookie) || !stsz || !stco?.length) return EMPTY // moov/tables not ready
 
 		if (alacCookie) {
@@ -341,7 +347,10 @@ function parseBoxes(buf, start, end, cb) {
 
 		let bodyOff = off + 8
 		if (type === 'stsd') parseSampleDesc(buf, bodyOff, size - 8, cb)
-		else if (CONTAINERS.has(type)) parseBoxes(buf, bodyOff + (type === 'meta' ? 4 : 0), off + size, cb)
+		else if (CONTAINERS.has(type)) {
+			if (type === 'trak') cb(type, null) // track boundary — tables that follow belong to this trak
+			parseBoxes(buf, bodyOff + (type === 'meta' ? 4 : 0), off + size, cb)
+		}
 		else cb(type, buf.subarray(bodyOff, off + size))
 
 		off += size

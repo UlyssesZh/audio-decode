@@ -181,6 +181,38 @@ console.log('M4A streaming (faststart)')
 	}
 }
 
+// ---- M4A with a chapter track ----
+// Regression: github #48 — a second non-audio trak (QuickTime chapter/text track,
+// e.g. ffmpeg-copied Logic Pro markers) clobbered the audio trak's stsz/stco/stsc
+// in the flat moov parse → 0 frames. Tables must come from the audio trak only.
+console.log('M4A chapter track')
+{
+	let chaptered = readFileSync(new URL('./fixtures/chaptered.m4a', import.meta.url))
+	// phase-independent pitch estimate (AAC priming shifts the signal): zero-crossing rate
+	let freq = (ch, sr) => {
+		let a = ch.subarray(4096, ch.length - 1024), z = 0
+		for (let i = 1; i < a.length; i++) if ((a[i - 1] < 0) !== (a[i] < 0)) z++
+		return z * sr / (2 * a.length)
+	}
+
+	let r = await decode(chaptered)
+	ok(r.channelData.length === 2, 'stereo')
+	ok(r.sampleRate === 44100, 'sampleRate 44100')
+	ok(near(r.channelData[0].length / r.sampleRate, 2.0, 0.1), 'duration ~2s (' + (r.channelData[0].length / r.sampleRate).toFixed(2) + 's)')
+	ok(rms(r.channelData[0]) > 0.05, 'has audio content')
+	ok(near(freq(r.channelData[0], r.sampleRate) / 440, 1, 0.05), 'ch0 ≈ 440Hz')
+	ok(near(freq(r.channelData[1], r.sampleRate) / 660, 1, 0.05), 'ch1 ≈ 660Hz')
+
+	// chunked feed goes through the same trak selection on the streaming path
+	let dec = await decoder(), total = 0
+	for (let off = 0; off < chaptered.length; off += 1024) {
+		let c = dec.decode(chaptered.subarray(off, Math.min(off + 1024, chaptered.length)))
+		if (c.channelData.length) total += c.channelData[0].length
+	}
+	dec.free()
+	ok(total === r.channelData[0].length, 'chunked count matches (' + total + ')')
+}
+
 // ---- ADTS streaming (partial frame buffering) ----
 console.log('ADTS streaming')
 {
