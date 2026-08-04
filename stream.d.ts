@@ -10,6 +10,3 @@ declare function decodeChunked(
 
 export default decodeChunked;
 export { decodeChunked };
-
-export default decodeStream;
-export { decodeStream };
