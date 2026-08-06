@@ -4,7 +4,7 @@ Decode any audio format to raw samples.<br>
 JS / WASM – no ffmpeg, no native bindings, works in both node and browser.<br>
 Small API, minimal size, near-native performance, lazy-loading, chunked decoding.
 
-[![npm install @audio/decode](https://nodei.co/npm/audio-decode.png?mini=true)](https://npmjs.org/package/@audio/decode/)
+[![npm install @audio/decode](https://nodei.co/npm/@audio/decode.png?mini=true)](https://npmjs.org/package/@audio/decode/)
 
 ```js
 import decode from '@audio/decode';
@@ -68,37 +68,16 @@ Formats: `mp3`, `flac`, `opus`, `oga`, `m4a`, `wav`, `qoa`, `aac`, `aiff`, `caf`
 
 ### Browser
 
-Each codec is a self-contained bundle under `@audio/*` — no transitive deps, no import map bloat.
-For selective loading in the browser (avoids bundling all codecs):
+Works from CDN without a bundler – codecs load on demand via dynamic import, only for formats you actually decode:
 
 ```html
-<script type="importmap">
-{
-  "imports": {
-    "@audio/decode": "https://esm.sh/audio-decode",
-    "audio-type": "https://esm.sh/audio-type",
-    "@audio/decode-mp3": "https://esm.sh/@audio/decode-mp3",
-    "@audio/decode-wav": "https://esm.sh/@audio/decode-wav",
-    "@audio/decode-flac": "https://esm.sh/@audio/decode-flac",
-    "@audio/decode-opus": "https://esm.sh/@audio/decode-opus",
-    "@audio/decode-vorbis": "https://esm.sh/@audio/decode-vorbis",
-    "@audio/decode-aac": "https://esm.sh/@audio/decode-aac",
-    "@audio/decode-qoa": "https://esm.sh/@audio/decode-qoa",
-    "@audio/decode-aiff": "https://esm.sh/@audio/decode-aiff",
-    "@audio/decode-caf": "https://esm.sh/@audio/decode-caf",
-    "@audio/decode-webm": "https://esm.sh/@audio/decode-webm",
-    "@audio/decode-amr": "https://esm.sh/@audio/decode-amr",
-    "@audio/decode-wma": "https://esm.sh/@audio/decode-wma"
-  }
-}
-</script>
 <script type="module">
-  import decode from '@audio/decode'
+  import decode from 'https://esm.sh/@audio/decode'
   let { channelData, sampleRate } = await decode(buf)
 </script>
 ```
 
-Only list the codecs you need — each `@audio/decode-*` package bundles all its WASM/JS deps internally.
+Self-hosting instead of a CDN? Use an import map to point `@audio/decode` and each `@audio/decode-*` package you need to its local path – every codec is a self-contained bundle (WASM inlined, no transitive deps).
 
 ### Metadata
 
