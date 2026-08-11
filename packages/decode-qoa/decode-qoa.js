@@ -260,13 +260,10 @@ function decode(data) {
 }
 
 // src/decode-qoa.src.js
-async function decode2(src) {
-  let buf = src instanceof Uint8Array ? src : new Uint8Array(src);
-  return decode(buf);
-}
-async function decoder() {
+var decodeQoa = (src) => decode(src instanceof Uint8Array ? src : new Uint8Array(src));
+function decoder() {
   return {
-    decode: (chunk) => decode(chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk)),
+    decode: decodeQoa,
     flush: () => ({ channelData: [], sampleRate: 0 }),
     free: () => {
     }
@@ -274,5 +271,5 @@ async function decoder() {
 }
 export {
   decoder,
-  decode2 as default
+  decodeQoa as default
 };

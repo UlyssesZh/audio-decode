@@ -1,17 +1,18 @@
 /**
- * QOA decoder — Quite OK Audio format
+ * QOA (Quite OK Audio) decoder
  * @module @audio/decode-qoa
  */
-import qoaDecode from 'qoa-format/decode.js'
+import decodeQoaData from 'qoa-format/decode.js'
 
-export default async function decode(src) {
-	let buf = src instanceof Uint8Array ? src : new Uint8Array(src)
-	return qoaDecode(buf)
-}
+/** Decode a complete QOA file synchronously. */
+const decodeQoa = src => decodeQoaData(src instanceof Uint8Array ? src : new Uint8Array(src))
 
-export async function decoder() {
+export { decodeQoa as default }
+
+/** Create a synchronous stateless decoder. */
+export function decoder() {
 	return {
-		decode: chunk => qoaDecode(chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk)),
+		decode: decodeQoa,
 		flush: () => ({ channelData: [], sampleRate: 0 }),
 		free: () => {}
 	}

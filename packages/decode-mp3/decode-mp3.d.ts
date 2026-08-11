@@ -1,11 +1,11 @@
-interface AudioData {
+export interface AudioData {
   channelData: Float32Array[];
   sampleRate: number;
 }
 
 interface Mp3Decoder {
-  decode(data: Uint8Array): AudioData;
-  flush(): AudioData;
+  /** Decode a chunk synchronously. */
+  decode(data: Uint8Array | ArrayBuffer): AudioData;
   free(): void;
 }
 

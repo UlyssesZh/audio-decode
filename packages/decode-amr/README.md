@@ -1,8 +1,6 @@
 # @audio/decode-amr
 
-Decode AMR-NB and AMR-WB audio to PCM float samples. [opencore-amr](https://sourceforge.net/projects/opencore-amr/) compiled to WASM — works in Node.js and browsers.
-
-Part of [decode](https://github.com/audiojs/decode).
+Decode AMR-NB and AMR-WB audio to PCM float samples with [opencore-amr](https://sourceforge.net/projects/opencore-amr/) WASM.
 
 ## Install
 
@@ -15,7 +13,7 @@ npm i @audio/decode-amr
 ```js
 import decode from '@audio/decode-amr'
 
-// AMR-NB or AMR-WB — auto-detected from file header
+// AMR-NB or AMR-WB; auto-detected from the file header
 let { channelData, sampleRate } = await decode(amrBuffer)
 // AMR-NB: 8000 Hz mono
 // AMR-WB: 16000 Hz mono
@@ -31,6 +29,8 @@ let result = dec.decode(chunk)
 dec.free()
 ```
 
+`decoder()` is asynchronous. Its `decode()` and `flush()` methods are synchronous.
+
 ## API
 
 ### `decode(src): Promise<AudioData>`
@@ -41,14 +41,14 @@ Whole-file decode. Accepts `Uint8Array` or `ArrayBuffer`. Auto-detects AMR-NB (`
 
 Creates a decoder instance.
 
-- **`dec.decode(data)`** — decode chunk, returns `{ channelData, sampleRate }`
-- **`dec.flush()`** — flush (returns empty)
-- **`dec.free()`** — release WASM memory
+- `dec.decode(data)`: decode a `Uint8Array` or `ArrayBuffer` chunk.
+- `dec.flush()`: discard buffered partial data and return an empty result.
+- `dec.free()`: release WASM memory.
 
 ## Formats
 
-- AMR-NB — 8 kHz, modes 0–7 (4.75–12.2 kbps)
-- AMR-WB — 16 kHz, modes 0–8 (6.6–23.85 kbps)
+- AMR-NB: 8 kHz, modes 0–7 (4.75–12.2 kbps)
+- AMR-WB: 16 kHz, modes 0–8 (6.6–23.85 kbps)
 
 ## Building WASM
 
@@ -62,4 +62,4 @@ This auto-fetches opencore-amr 0.1.6 source and compiles with Emscripten.
 
 ## License
 
-Apache-2.0 (opencore-amr) — [krishnized](https://github.com/krishnized/license)
+[ॐ](https://github.com/krishnized/license/) · [Apache-2.0](./LICENSE) (opencore-amr)

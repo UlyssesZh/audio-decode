@@ -102,6 +102,26 @@ let signal = sine(1000)
 	ok(near(r.channelData[0][100], signal[100], 0.000001), '64-bit float: value')
 }
 
+// ===== sync API =====
+
+{
+	let wav = buildWav({ ch: 2, bitDepth: 16, samples: sine(500).flatMap((v, i) => [v, v]) })
+	let r = decode(wav)
+	ok(!(r instanceof Promise), 'decode returns value, not promise')
+	ok(r.channelData.length === 2, 'decode: stereo channels')
+	ok(r.channelData[0].length === 500, 'decode: frames')
+
+	let dec = decoder()
+	ok(!(dec instanceof Promise), 'decoder returns instance, not promise')
+	let bytes = new Uint8Array(wav)
+	let half = bytes.length >> 1
+	let a = dec.decode(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + half))
+	let b = dec.decode(bytes.subarray(half))
+	dec.free()
+	let total = (a.channelData[0]?.length || 0) + (b.channelData[0]?.length || 0)
+	ok(total === 500, 'decoder: chunked ArrayBuffer decode complete')
+}
+
 // ===== stereo =====
 
 {

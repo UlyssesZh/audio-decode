@@ -247,6 +247,8 @@ console.log('edge cases')
 	// empty input
 	let d = await decoder()
 	let r = d.decode(new Uint8Array(0))
+	let tail = d.flush()
+	ok(!(r instanceof Promise) && !(tail instanceof Promise), 'decode and flush return values')
 	ok(r.channelData.length === 0, 'empty input → EMPTY')
 	d.free()
 
@@ -275,8 +277,13 @@ console.log('edge cases')
 	d.free()
 
 	// ArrayBuffer input
-	r = await decode(m4a.buffer.slice(m4a.byteOffset, m4a.byteOffset + m4a.length))
+	let input = m4a.buffer.slice(m4a.byteOffset, m4a.byteOffset + m4a.length)
+	r = await decode(input)
 	ok(r.channelData.length === 2, 'ArrayBuffer input works')
+	d = await decoder()
+	r = d.decode(input)
+	d.free()
+	ok(r.channelData.length === 2, 'decoder accepts ArrayBuffer')
 }
 
 // ---- Performance ----

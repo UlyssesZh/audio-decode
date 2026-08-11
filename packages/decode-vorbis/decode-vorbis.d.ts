@@ -1,16 +1,18 @@
-interface AudioData {
+export interface AudioData {
   channelData: Float32Array[];
   sampleRate: number;
 }
 
 interface VorbisDecoder {
-  decode(data: Uint8Array): AudioData;
+  /** Decode a chunk synchronously. */
+  decode(data: Uint8Array | ArrayBuffer): AudioData;
+  /** Finish the stream synchronously. Create a new decoder for another stream. */
   flush(): AudioData;
   free(): void;
 }
 
-/** Whole-file Ogg Vorbis decode */
+/** Decode a complete Ogg Vorbis file. */
 export default function decode(src: ArrayBuffer | Uint8Array): Promise<AudioData>;
 
-/** Create streaming decoder instance */
+/** Initialize WASM and create a decoder with synchronous methods. */
 export function decoder(): Promise<VorbisDecoder>;

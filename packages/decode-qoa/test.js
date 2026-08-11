@@ -30,5 +30,21 @@ console.log('QOA decoder')
 	dec.free()
 }
 
+// sync API
+console.log('QOA sync')
+{
+	let r = decode(qoa)
+	ok(!(r instanceof Promise), 'decode returns value, not promise')
+	ok(r.channelData.length >= 1, 'has channels')
+	ok(r.channelData[0].length > 0, 'has samples')
+
+	let dec = decoder()
+	ok(!(dec instanceof Promise), 'decoder returns instance, not promise')
+	let input = qoa.buffer.slice(qoa.byteOffset, qoa.byteOffset + qoa.byteLength)
+	let r2 = dec.decode(input)
+	ok(r2.channelData[0].length === r.channelData[0].length, 'decoder: ArrayBuffer has same frames')
+	dec.free()
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail) process.exit(1)

@@ -60,6 +60,18 @@ ok(await (async () => {
 	catch { return true }
 })(), 'rejects empty ArrayBuffer')
 
+ok(await (async () => {
+	let invalid = readFileSync(fixture)
+	let cluster = invalid.indexOf(Buffer.from([0x1f, 0x43, 0xb6, 0x75]))
+	if (cluster < 0) return false
+	invalid = invalid.subarray(0, cluster).slice()
+	let head = invalid.indexOf('OpusHead')
+	if (head < 0) return false
+	invalid[head + 9] = 0
+	try { await decode(invalid); return false }
+	catch (error) { return invalid.length < 8192 && error.message.includes('Invalid Opus CodecPrivate') }
+})(), 'rejects a small zero-channel OpusHead')
+
 // --- Decoder lifecycle ---
 
 console.log('Decoder lifecycle')
@@ -67,7 +79,7 @@ console.log('Decoder lifecycle')
 ok(await (async () => {
 	let dec = await decoder()
 	dec.free()
-	try { await dec.decode(new Uint8Array(10)); return false }
+	try { dec.decode(new Uint8Array(10)); return false }
 	catch (e) { return e.message.includes('freed') }
 })(), 'decode after free throws')
 
@@ -80,21 +92,48 @@ ok(await (async () => {
 
 ok(await (async () => {
 	let dec = await decoder()
-	let r = await dec.flush()
+	let r = dec.flush()
 	return r.channelData.length === 0 && r.sampleRate === 0
 })(), 'flush without data returns empty')
 
 ok(await (async () => {
 	let dec = await decoder()
-	let r = await dec.decode(null)
+	let r = dec.decode(null)
 	return r.channelData.length === 0 && r.sampleRate === 0
 })(), 'decode null returns empty')
 
 ok(await (async () => {
 	let dec = await decoder()
-	let r = await dec.decode(new Uint8Array(0))
+	let r = dec.decode(new Uint8Array(0))
 	return r.channelData.length === 0 && r.sampleRate === 0
 })(), 'decode empty returns empty')
+
+// --- Synchronous decoder methods ---
+
+console.log('Synchronous decoder methods')
+for (let [name, file] of [
+	['opus', './fixtures/test.webm'],
+	['vorbis', './fixtures/vorbis-mono.webm']
+]) {
+	let webm = readFileSync(new URL(file, import.meta.url))
+	let whole = await decode(webm)
+	let dec = await decoder(), results = [], sync = true
+	for (let offset = 0, size = 1; offset < webm.length; offset += size, size = Math.min(size * 3, 4093)) {
+		let chunk = webm.subarray(offset, offset + size)
+		let result = dec.decode(offset ? chunk : chunk.slice().buffer)
+		sync &&= !(result instanceof Promise)
+		results.push(result)
+	}
+	let tail = dec.flush()
+	sync &&= !(tail instanceof Promise)
+	results.push(tail)
+	let total = results.reduce((samples, result) => samples + (result.channelData[0]?.length || 0), 0)
+	ok(sync, name + ': decode and flush return values')
+	ok(total === whole.channelData[0].length, name + ': chunked length matches whole-file')
+	let threw = false
+	try { dec.decode(webm) } catch { threw = true }
+	ok(threw, name + ': decode after flush throws')
+}
 
 // --- Integration tests (require ffmpeg fixture) ---
 
@@ -130,10 +169,11 @@ if (hasFixture) {
 	// Streaming decoder test
 	ok(await (async () => {
 		let dec = await decoder()
-		let r = await dec.decode(new Uint8Array(webm))
-		let ok1 = r.channelData.length === 1 && r.sampleRate === 48000
-		let f = await dec.flush()
-		return ok1 && f.sampleRate === 0
+		let input = webm.buffer.slice(webm.byteOffset, webm.byteOffset + webm.byteLength)
+		let r = dec.decode(input)
+		let ok1 = !(r instanceof Promise) && r.channelData.length === 1 && r.sampleRate === 48000
+		let f = dec.flush()
+		return ok1 && !(f instanceof Promise) && f.sampleRate === 0
 	})(), 'streaming decoder works')
 } else {
 	console.log('SKIP: WebM+Opus mono decode (no ffmpeg / fixture)')

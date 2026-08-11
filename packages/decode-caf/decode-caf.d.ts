@@ -1,16 +1,16 @@
-interface AudioData {
+export interface AudioData {
   channelData: Float32Array[];
   sampleRate: number;
 }
 
 interface CAFDecoder {
-  decode(data: Uint8Array): AudioData;
+  decode(data: Uint8Array | ArrayBuffer): AudioData;
   flush(): AudioData;
   free(): void;
 }
 
-/** Whole-file decode of CAF audio */
-export default function decode(src: ArrayBuffer | Uint8Array): Promise<AudioData>;
+/** Decode a complete CAF file synchronously. */
+export default function decode(src: ArrayBuffer | Uint8Array): AudioData;
 
-/** Create decoder instance */
-export function decoder(): Promise<CAFDecoder>;
+/** Create a synchronous decoder. */
+export function decoder(): CAFDecoder;

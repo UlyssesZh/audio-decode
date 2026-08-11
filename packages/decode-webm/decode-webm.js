@@ -1,3086 +1,7 @@
-// ../../node_modules/simple-yenc/dist/esm.js
-var t = (t2, n = 4294967295, e2 = 79764919) => {
-  const r = new Int32Array(256);
-  let o, s, i, c = n;
-  for (o = 0; o < 256; o++) {
-    for (i = o << 24, s = 8; s > 0; --s) i = 2147483648 & i ? i << 1 ^ e2 : i << 1;
-    r[o] = i;
-  }
-  for (o = 0; o < t2.length; o++) c = c << 8 ^ r[255 & (c >> 24 ^ t2[o])];
-  return c;
-};
-var e = (n, e2 = t) => {
-  const r = (t2) => new Uint8Array(t2.length / 2).map(((n2, e3) => parseInt(t2.substring(2 * e3, 2 * (e3 + 1)), 16))), o = (t2) => r(t2)[0], s = /* @__PURE__ */ new Map();
-  [, 8364, , 8218, 402, 8222, 8230, 8224, 8225, 710, 8240, 352, 8249, 338, , 381, , , 8216, 8217, 8220, 8221, 8226, 8211, 8212, 732, 8482, 353, 8250, 339, , 382, 376].forEach(((t2, n2) => s.set(t2, n2)));
-  const i = new Uint8Array(n.length);
-  let c, a, l, f = false, g = 0, h = 42, p = n.length > 13 && "dynEncode" === n.substring(0, 9), u = 0;
-  p && (u = 11, a = o(n.substring(9, u)), a <= 1 && (u += 2, h = o(n.substring(11, u))), 1 === a && (u += 8, l = ((t2) => new DataView(r(t2).buffer).getInt32(0, true))(n.substring(13, u))));
-  const d = 256 - h;
-  for (let t2 = u; t2 < n.length; t2++) if (c = n.charCodeAt(t2), 61 !== c || f) {
-    if (92 === c && t2 < n.length - 5 && p) {
-      const e3 = n.charCodeAt(t2 + 1);
-      117 !== e3 && 85 !== e3 || (c = parseInt(n.substring(t2 + 2, t2 + 6), 16), t2 += 5);
-    }
-    if (c > 255) {
-      const t3 = s.get(c);
-      t3 && (c = t3 + 127);
-    }
-    f && (f = false, c -= 64), i[g++] = c < h && c > 0 ? c + d : c - h;
-  } else f = true;
-  const m = i.subarray(0, g);
-  if (p && 1 === a) {
-    const t2 = e2(m);
-    if (t2 !== l) {
-      const n2 = "Decode failed crc32 validation";
-      throw console.error("`simple-yenc`\n", n2 + "\n", "Expected: " + l + "; Got: " + t2 + "\n", "Visit https://github.com/eshaz/simple-yenc for more information"), Error(n2);
-    }
-  }
-  return m;
-};
-
-// ../../node_modules/@wasm-audio-decoders/common/src/WASMAudioDecoderCommon.js
-function WASMAudioDecoderCommon() {
-  const uint8Array2 = Uint8Array;
-  const float32Array = Float32Array;
-  if (!WASMAudioDecoderCommon.modules) {
-    Object.defineProperties(WASMAudioDecoderCommon, {
-      modules: {
-        value: /* @__PURE__ */ new WeakMap()
-      },
-      setModule: {
-        value(Ref, module) {
-          WASMAudioDecoderCommon.modules.set(Ref, Promise.resolve(module));
-        }
-      },
-      getModule: {
-        value(Ref, wasmString) {
-          let module = WASMAudioDecoderCommon.modules.get(Ref);
-          if (!module) {
-            if (!wasmString) {
-              wasmString = Ref.wasm;
-              module = WASMAudioDecoderCommon.inflateDynEncodeString(
-                wasmString
-              ).then((data3) => WebAssembly.compile(data3));
-            } else {
-              module = WebAssembly.compile(e(wasmString));
-            }
-            WASMAudioDecoderCommon.modules.set(Ref, module);
-          }
-          return module;
-        }
-      },
-      concatFloat32: {
-        value(buffers, length2) {
-          let ret = new float32Array(length2), i = 0, offset = 0;
-          while (i < buffers.length) {
-            ret.set(buffers[i], offset);
-            offset += buffers[i++].length;
-          }
-          return ret;
-        }
-      },
-      getDecodedAudio: {
-        value: (errors, channelData, samplesDecoded, sampleRate2, bitDepth2) => ({
-          errors,
-          channelData,
-          samplesDecoded,
-          sampleRate: sampleRate2,
-          bitDepth: bitDepth2
-        })
-      },
-      getDecodedAudioMultiChannel: {
-        value(errors, input, channelsDecoded, samplesDecoded, sampleRate2, bitDepth2) {
-          let channelData = [], i, j;
-          for (i = 0; i < channelsDecoded; i++) {
-            const channel2 = [];
-            for (j = 0; j < input.length; ) channel2.push(input[j++][i] || []);
-            channelData.push(
-              WASMAudioDecoderCommon.concatFloat32(channel2, samplesDecoded)
-            );
-          }
-          return WASMAudioDecoderCommon.getDecodedAudio(
-            errors,
-            channelData,
-            samplesDecoded,
-            sampleRate2,
-            bitDepth2
-          );
-        }
-      },
-      /*
-       ******************
-       * Compression Code
-       ******************
-       */
-      inflateDynEncodeString: {
-        value(source) {
-          source = e(source);
-          return new Promise((resolve) => {
-            const puffString = String.raw`dynEncode012804c7886d()((()>+*§§)§,§§§§)§+§§§)§+.-()(*)-+)(.7*§)i¸¸,3§(i¸¸,3/G+.¡*(,(,3+)2å:-),§H(P*DI*H(P*@I++hH)H*r,hH(H(P*<J,i)^*<H,H(P*4U((I-H(H*i0J,^*DH+H-H*I+H,I*4)33H(H*H)^*DH(H+H)^*@H+i§H)i§3æ*).§K(iHI/+§H,iHn,§H+i(H+i(rCJ0I,H*I-+hH,,hH(H-V)(i)J.H.W)(i)c)(H,i)I,H-i*I-4)33i(I.*hH(V)(H+n5(H(i*I-i(I,i)I.+hH,i*J+iHn,hi(I-i*I,+hH,H/H-c)(H,iFn,hi(I,+hH,H0n5-H*V)(J(,hH/H(i)J(H(V)(J(i)c)(H)H(i)H,c)(3H*i*I*H,i)I,4(3(-H(H,W)(H-I-H,i*I,4)3(3(3H,H-I1H+I,H.i)H1V)(J.i(v5(33H.-H(H,i(c)(H,i*I,4)333)-§i*I*+§H*iHn,hi73H,H(i)8(H+J+H)P*(H*V)(J-r,§H)P*,H.i)H+H,i)V)(-H*i*I*H+i)I+H-H.I.H,H-i)I,4)333Ã+)-§iø7i(^*(iü7I,*h+hH+iDn,h*hilI+i)I,+hH+,hH+iô7H,c)(i)H+i´8W)(H,I,H+i*I+4)-+hH(H)8*J-i(p5.*h*h*hH-i')u,hH(P*(J+,hH(P*0J,H(P*,n50H+H,H-b((3H(P*0i)I.4)3H-i¨*n5*H-iÅ*s,hi73H-i)J+V)&+I,H(H+V)æ,8(I.H(H*8*J-i(p51H-i)J+i¸7V)(H(H+iø7V)(8(J/H(P*0J+s,hi73H+H,H.J,I.H(P*(m5(H.H(P*,s5.+hH,m5*H(P*(J.H+H.H+H/U((b((H(H(P*0i)J+^*0H,i)I,4(3(3H(H.^*03H-i¨*o5)33i(73(3(3-H,H+i)c)(H,i*I,H+i)I+4)33i)I-3H-3!2)0§K(i2J,L(H,H(^*(H,H*^*4H,i(^*0H,i(^*DH,j(_*<H,H)P*(^*,H,H+P*(^*8*h*h+hH,i)8(I3i§I**h*h*h*h*h*h*hH,i*8(6+(),03H,j(_*@i*I-H,P*<J.i,J(H,P*8J/s50H,H.i+J0^*<i¦I*H.H,P*4J1J.U(*H.U((J2i')o5/H.U()I.H,H(^*<H0H1U((H.i0J.i§i0i')o5/H/H.H2J*H(J.q50H,P*0J/H*I-H,P*(J0,hH,P*,H-q,hi)I-423+hH*m5+H/H0H(H1U((b((H/i)I/H(i)I(H*i)I*4(3(3H,H.^*<H,H-^*04*3iØ1U((5+i(I(i¨7i1^*(i$6iè1^*(i°7iè6^*(i¬7iÈ6^*(+hH(iÈ*n,hiÈ*I(+hH(i¨,n,hi¨,I(+hH(iØ,n,hiØ,I(+hH(iè,o,hH,i-H(i0c)(H(i*I(4)33iè1i1H,i-iÈ*8)Bi(I(+hH(ido,hH,i-H(i-c)(H(i*I(4)33iÈ6iè6H,i-iF8)BiØ1i)b((41-H,i-H(i/c)(H(i*I(4)3(3(-H,i-H(i1c)(H(i*I(4)3(3(-H,i-H(i0c)(H(i*I(4)3(3(3H,H/^*0H,H(^*<3i(I*4*3H,H,i¸)^*TH,H,iø-^*PH,H,iX^*LH,H,i(^*HH,i-8(I(H,i-8(I-i¥I*H,i,8(I.H(iErH-iEr5)H(i©*I1H-i)I0i(i;H.i,J(i(H(i(rCJ(J*H*i;sCI*i¨1I-H(I/+hH/,hH,i-H-V)(i)H,i+8(c)(H/i)I/H-i*I-H*i)I*4)-H(i)i¨1I/+hH(H*o,hH,i-H/V)(i)i(c)(H/i*I/H(i)I(4)33i¤I*H,iø-H,i¸)H,i-i;8)5+H0H1I2i(I-+hH-H2p,hH,H,iP8*J*i(p5-H*i7u,hH,i-H-i)H*c)(H-i)I-4*3i(I/i+I.i+I(*h*h*hH*i86*(*)3H-m,hi£I*403H-i)H,W)-I/i*I(4)3i3I.i/I(3H2H,H(8(H.J(H-J.p,hi¢I*4.3H,i-H-i)I*+hH(,hH*H/c)(H*i*I*H(i)I(4)-H.I-4+3(3(33H,W)1m,hiI*4,3H,iø-H,i¸)H,i-H18)J(,hi¡I*H(i(p5,H1H,V)ú-H,V)ø-o5,3H,i(H,iXH,i-H1i)H08)J(,hi I*H(i(p5,H0H,V)H,V)o5,3H,H,iPH,iH8+I*4+3(3(3H,i$6i¬78+I*3H*H3m5(3i)I-H*i(r5)3H)H,P*0^*(H+H,P*<^*(H*I-3H,i2L(H-33Á)+(i¨03b+(,(-(.(/(0(1(2(3(5(7(9(;(?(C(G(K(S([(c(k({(((«(Ë(ë((*)(iø03O)()()()(*(*(*(*(+(+(+(+(,(,(,(,(-(-(-(-(i¨13M8(9(:(((0(/(1(.(2(-(3(,(4(+(5(*(6()(7(T7*S7US0U `;
-            WASMAudioDecoderCommon.getModule(WASMAudioDecoderCommon, puffString).then((wasm) => WebAssembly.instantiate(wasm, {})).then(({ exports }) => {
-              const instanceExports = new Map(Object.entries(exports));
-              const puff = instanceExports.get("puff");
-              const memory = instanceExports.get("memory")["buffer"];
-              const dataArray = new uint8Array2(memory);
-              const heapView = new DataView(memory);
-              let heapPos = instanceExports.get("__heap_base");
-              const sourceLength = source.length;
-              const sourceLengthPtr = heapPos;
-              heapPos += 4;
-              heapView.setInt32(sourceLengthPtr, sourceLength, true);
-              const sourcePtr = heapPos;
-              heapPos += sourceLength;
-              dataArray.set(source, sourcePtr);
-              const destLengthPtr = heapPos;
-              heapPos += 4;
-              heapView.setInt32(
-                destLengthPtr,
-                dataArray.byteLength - heapPos,
-                true
-              );
-              puff(heapPos, destLengthPtr, sourcePtr, sourceLengthPtr);
-              resolve(
-                dataArray.slice(
-                  heapPos,
-                  heapPos + heapView.getInt32(destLengthPtr, true)
-                )
-              );
-            });
-          });
-        }
-      }
-    });
-  }
-  Object.defineProperty(this, "wasm", {
-    enumerable: true,
-    get: () => this._wasm
-  });
-  this.getOutputChannels = (outputData, channelsDecoded, samplesDecoded) => {
-    let output = [], i = 0;
-    while (i < channelsDecoded)
-      output.push(
-        outputData.slice(
-          i * samplesDecoded,
-          i++ * samplesDecoded + samplesDecoded
-        )
-      );
-    return output;
-  };
-  this.allocateTypedArray = (len, TypedArray, setPointer = true) => {
-    const ptr = this._wasm.malloc(TypedArray.BYTES_PER_ELEMENT * len);
-    if (setPointer) this._pointers.add(ptr);
-    return {
-      ptr,
-      len,
-      buf: new TypedArray(this._wasm.HEAP, ptr, len)
-    };
-  };
-  this.free = () => {
-    this._pointers.forEach((ptr) => {
-      this._wasm.free(ptr);
-    });
-    this._pointers.clear();
-  };
-  this.codeToString = (ptr) => {
-    const characters = [], heap = new Uint8Array(this._wasm.HEAP);
-    for (let character = heap[ptr]; character !== 0; character = heap[++ptr])
-      characters.push(character);
-    return String.fromCharCode.apply(null, characters);
-  };
-  this.addError = (errors, message, frameLength2, frameNumber2, inputBytes, outputSamples) => {
-    errors.push({
-      message,
-      frameLength: frameLength2,
-      frameNumber: frameNumber2,
-      inputBytes,
-      outputSamples
-    });
-  };
-  this.instantiate = (_EmscriptenWASM, _module) => {
-    if (_module) WASMAudioDecoderCommon.setModule(_EmscriptenWASM, _module);
-    this._wasm = new _EmscriptenWASM(WASMAudioDecoderCommon).instantiate();
-    this._pointers = /* @__PURE__ */ new Set();
-    return this._wasm.ready.then(() => this);
-  };
-}
-
-// ../_build/empty-worker.js
-var empty_worker_default = null;
-
-// ../../node_modules/@wasm-audio-decoders/common/src/WASMAudioDecoderWorker.js
-var getWorker = () => globalThis.Worker || empty_worker_default;
-var WASMAudioDecoderWorker = class extends getWorker() {
-  constructor(options, name, Decoder2, EmscriptenWASM3) {
-    if (!WASMAudioDecoderCommon.modules) new WASMAudioDecoderCommon();
-    let source = WASMAudioDecoderCommon.modules.get(Decoder2);
-    if (!source) {
-      let type = "text/javascript", isNode, webworkerSourceCode = `'use strict';(${((_Decoder, _WASMAudioDecoderCommon, _EmscriptenWASM) => {
-        let decoder2, moduleResolve, modulePromise = new Promise((resolve) => {
-          moduleResolve = resolve;
-        });
-        self.onmessage = ({ data: { id, command, data: data3 } }) => {
-          let messagePromise = modulePromise, messagePayload = { id }, transferList;
-          if (command === "init") {
-            Object.defineProperties(_Decoder, {
-              WASMAudioDecoderCommon: { value: _WASMAudioDecoderCommon },
-              EmscriptenWASM: { value: _EmscriptenWASM },
-              module: { value: data3.module },
-              isWebWorker: { value: true }
-            });
-            decoder2 = new _Decoder(data3.options);
-            moduleResolve();
-          } else if (command === "free") {
-            decoder2.free();
-          } else if (command === "ready") {
-            messagePromise = messagePromise.then(() => decoder2.ready);
-          } else if (command === "reset") {
-            messagePromise = messagePromise.then(() => decoder2.reset());
-          } else {
-            Object.assign(
-              messagePayload,
-              decoder2[command](
-                // detach buffers
-                Array.isArray(data3) ? data3.map((data4) => new Uint8Array(data4)) : new Uint8Array(data3)
-              )
-            );
-            transferList = messagePayload.channelData ? messagePayload.channelData.map((channel2) => channel2.buffer) : [];
-          }
-          messagePromise.then(
-            () => self.postMessage(messagePayload, transferList)
-          );
-        };
-      }).toString()})(${Decoder2}, ${WASMAudioDecoderCommon}, ${EmscriptenWASM3})`;
-      try {
-        isNode = typeof process.versions.node !== "undefined";
-      } catch {
-      }
-      source = isNode ? `data:${type};base64,${Buffer.from(webworkerSourceCode).toString(
-        "base64"
-      )}` : URL.createObjectURL(new Blob([webworkerSourceCode], { type }));
-      WASMAudioDecoderCommon.modules.set(Decoder2, source);
-    }
-    super(source, { name });
-    this._id = Number.MIN_SAFE_INTEGER;
-    this._enqueuedOperations = /* @__PURE__ */ new Map();
-    this.onmessage = ({ data: data3 }) => {
-      const { id, ...rest } = data3;
-      this._enqueuedOperations.get(id)(rest);
-      this._enqueuedOperations.delete(id);
-    };
-    new EmscriptenWASM3(WASMAudioDecoderCommon).getModule().then((module) => {
-      this.postToDecoder("init", { module, options });
-    });
-  }
-  async postToDecoder(command, data3) {
-    return new Promise((resolve) => {
-      this.postMessage({
-        command,
-        id: this._id,
-        data: data3
-      });
-      this._enqueuedOperations.set(this._id++, resolve);
-    });
-  }
-  get ready() {
-    return this.postToDecoder("ready");
-  }
-  async free() {
-    await this.postToDecoder("free").finally(() => {
-      this.terminate();
-    });
-  }
-  async reset() {
-    await this.postToDecoder("reset");
-  }
-};
-
-// ../../node_modules/@wasm-audio-decoders/common/src/utilities.js
-var assignNames = (Class, name) => {
-  Object.defineProperty(Class, "name", { value: name });
-};
-
-// ../../node_modules/opus-decoder/src/EmscriptenWasm.js
-function EmscriptenWASM(WASMAudioDecoderCommon2) {
-  var Module = Module;
-  function ready() {
-  }
-  Module = {};
-  function abort(what) {
-    throw what;
-  }
-  var HEAP8, HEAP16, HEAP32, HEAPU8, HEAPU16, HEAPU32, HEAPF32, HEAPF64, HEAP64, HEAPU64, wasmMemory;
-  function updateMemoryViews() {
-    var b = wasmMemory.buffer;
-    HEAP8 = new Int8Array(b);
-    HEAP16 = new Int16Array(b);
-    HEAPU8 = new Uint8Array(b);
-    HEAPU16 = new Uint16Array(b);
-    HEAP32 = new Int32Array(b);
-    HEAPU32 = new Uint32Array(b);
-    HEAPF32 = new Float32Array(b);
-    HEAPF64 = new Float64Array(b);
-    HEAP64 = new BigInt64Array(b);
-    HEAPU64 = new BigUint64Array(b);
-  }
-  var base64Decode = (b64) => {
-    var b1, b2, i2 = 0, j = 0, bLength = b64.length;
-    var output = new Uint8Array((bLength * 3 >> 2) - (b64[bLength - 2] == "=") - (b64[bLength - 1] == "="));
-    for (; i2 < bLength; i2 += 4, j += 3) {
-      b1 = base64ReverseLookup[b64.charCodeAt(i2 + 1)];
-      b2 = base64ReverseLookup[b64.charCodeAt(i2 + 2)];
-      output[j] = base64ReverseLookup[b64.charCodeAt(i2)] << 2 | b1 >> 4;
-      output[j + 1] = b1 << 4 | b2 >> 2;
-      output[j + 2] = b2 << 6 | base64ReverseLookup[b64.charCodeAt(i2 + 3)];
-    }
-    return output;
-  };
-  var __abort_js = () => abort("");
-  var __emscripten_runtime_keepalive_clear = () => {
-  };
-  var timers = {};
-  var callUserCallback = (func) => func();
-  var _emscripten_get_now = () => performance.now();
-  var __setitimer_js = (which, timeout_ms) => {
-    if (timers[which]) {
-      clearTimeout(timers[which].id);
-      delete timers[which];
-    }
-    if (!timeout_ms) return 0;
-    var id = setTimeout(() => {
-      delete timers[which];
-      callUserCallback(() => __emscripten_timeout(which, _emscripten_get_now()));
-    }, timeout_ms);
-    timers[which] = {
-      id,
-      timeout_ms
-    };
-    return 0;
-  };
-  var _emscripten_math_cos = Math.cos;
-  var _emscripten_resize_heap = (requestedSize) => {
-    var oldSize = HEAPU8.length;
-    requestedSize >>>= 0;
-    return false;
-  };
-  var _proc_exit = (code) => {
-    throw `exit(${code})`;
-  };
-  for (var base64ReverseLookup = new Uint8Array(123), i = 25; i >= 0; --i) {
-    base64ReverseLookup[48 + i] = 52 + i;
-    base64ReverseLookup[65 + i] = i;
-    base64ReverseLookup[97 + i] = 26 + i;
-  }
-  base64ReverseLookup[43] = 62;
-  base64ReverseLookup[47] = 63;
-  var wasmImports = {
-    /** @export */
-    "d": __abort_js,
-    /** @export */
-    "c": __emscripten_runtime_keepalive_clear,
-    /** @export */
-    "e": __setitimer_js,
-    /** @export */
-    "a": _emscripten_math_cos,
-    /** @export */
-    "f": _emscripten_resize_heap,
-    /** @export */
-    "b": _proc_exit
-  };
-  function assignWasmExports(wasmExports) {
-    _opus_frame_decoder_create = wasmExports["i"];
-    _malloc = wasmExports["j"];
-    _opus_frame_decode_float_deinterleaved = wasmExports["k"];
-    _opus_frame_decoder_destroy = wasmExports["l"];
-    _free = wasmExports["m"];
-    __emscripten_timeout = wasmExports["o"];
-  }
-  var _opus_frame_decoder_create, _malloc, _opus_frame_decode_float_deinterleaved, _opus_frame_decoder_destroy, _free, __emscripten_timeout;
-  function initRuntime(wasmExports) {
-    wasmExports["h"]();
-  }
-  if (!EmscriptenWASM.wasm) Object.defineProperty(EmscriptenWASM, "wasm", { get: () => String.raw`dynEncode013bc58350c1Éð|@|O*XØ3R}@³ùÆöÁ¤½Cu­ÙFõ¶=}VònÐ¾ÑX³W~aGÕ5?Q= ÚÎN= WeÇ¸ß3í=MÛßÇ¹HÜjLvïêÀ:m°¹30>ÉX!¿býOýn
-®Fj{øú¢ç=}(ÝñÜn moÇ°¥àeò?È×µh
-ØW¨;Ñ aØX­æU{¤øàÖÕÀì·ÝÌ­íø±tâÔøeVO÷PÉ´È~ÃòsX1´ÊPyK·ÿKZçµ WÑ¡¡_ dÍí+]Õ~%Yïþîñ ¾Ú·p[òß ¶ó÷ylhnn«²ù*¶Ìéñ®ï(éÇÃRÊÆRÌ-¬ÐoÒÊ2z+ä$:ÄsxÏ#Ït!MlBq§%Jè	®Ä 3ó°á¸eÅ_Ö=}iTÐÍmoðbMpl¬EP°e,¼Æju®ix>#}NgdÿÇÄbç9WZÇ·n\Öá1ÚÈt.ú6bì:ûào¯ú4Ïø  ü­zå¯#ÆkM#úÿ9ë:üÒÝëÚà¡d%0ÒekÓ×mðÆ¸½ùÿâ¿Ò9	ÄgªÕÂ%ü¸»	HÁM#Âq²~èn¯Ûa_9j= ùÿRèæÊó%M
-¨,Àæq%98a9% T2)´z«9gsÒÖ!ZhRõRÛyÕ²Ý=M<Öcº	»~VFÕÖx:þrÞðn£x¦8.è$K9þÂ¹úSnÍ3¦v üuºsÕñ=}1=M5ZÊ¦CÿSÉ2×qÒ««Sa»ù±(¢º]ÀmÍh÷ /¥3@sns2	%7ù-Q|nÏoöjYÛ]}à2{EBêÎ6>ÁbÄü
-á,	[DAÐuùjeNDEëÔàZºlq» J/Ë²ájºßCÃÝ1b)øtN7Ê=}gÕ®òÍá§8² kDïû¤åÒÅóºc=M²= aË.ooèf.QZj@bñ>qV©?æxñRô|_xwê¸÷È¡ö"C¶2[¼ï¯¸©KmäºúZ¡%^°bóþ»-¼Ú¥ZI(pþµS%øµã*Ò±8f:t¡éþõz¶<Äfñ*öeP8AÓ¾/g×\Ð¡1Ï"= ¤ûGsW_¹ÔÈX	TãàuTíEKPüÝ¸#åB¢ñ?:µßÄ¬îFI8QY;X ¶í¦k{|¦éíà/fªi>´EÈoK= 6¼lÖr²ÿ*YÇvÄ­dàG{Ö,Gz½.gzSdïV%z¥8¶²bO¡2\nOßV¡S2KçK´UûuÛã~f¾K)ÊÖ#´?#»ÅYXOøò TCB}LUk,kÍ)]íiE^ÿyW)Ê»³= ô1_½úÌÞÊçýS¡
-»£jÆkhÐ1G<è^àÙç?æF¦Ç/ã«Eý6ZI¹tl.aëül|!&:MÓå?N@øËÅf 6cì$w,3~17F=Mð¸³°aõu\9æk	 I&>V®Æ/Øa´ %¶¢],ÿ:±wäé¬áS¥FK±U¢±ÓPóß&®e= ÍÍÜ¯Ï×À@= Ø#Ðk[NCó÷ÀÄÞGQRcnI}HGñ\ç­= öè^áygyDÔa©D¦'ß£Mß£PI¯à¨=}=MUÀ¸çy 9W½LíU·ôzwzÃsÝZòÓ3F¸Áè£âÑnÕ%Í¥ká®=M×GTÀÊøfëM-UF;uåÙ#X#
-n©ïÖDÅñ¸q ,Ô¹Ð¸;h¿åñ#µNÓ÷¸v} *Îª_= ãýØb6N=MH§'®Iu¯78ªÊÝ#42p´[/¿E= =MxåÄV§Ým©3?;bô9fb÷Ð'¨ÈIS7ñ>¬IÍÜK tçÖJ	7û6ß¥A/|BÏ=Mõªw¿T¼91ó íÒèÔ_6»Âõªvg2ý¡õ÷Ò=}Å3ýXm²¬bÛ}U¬0¸Ük~e
-aY¬ÈÛµ¨¢0Nñ¬t³VÉhÖYvx§"Ç5\N'ªÂ£æKlÂ?þ{m¼ôê±ñÔ|Lm¬t_2%¤E}Ù>ÎFûalSXø²tRªÀ8¥£Å|ÖW(Ù)\3Úwåì:oíý±Y4ì©géµC³¨Q\ÍõMÕ
-!J½6ë:Ëg ípoÒ=}I=}ëS¯¸F=}ÙT__U¾&\íÛ ¼Âkg#úÚ¡ÀsÏÔTµ³ÑËßxNÉæGç^4Ñ¡%.¦U±O[ø¼4 pÍº7ÜâªcÔ¦¢:ou¹8ÌzîXf¬56DC´Þ]Ó!=MOÀÕâGÖÓ«0¤¿Å2ú
-éÎ·NóÚÄr_Z)6y&2^F|#²ì36eòa¦rcLõ5Hö<r¼J!í¼©DøÓ@¨åPóf Ñ£®·§hQ®õ½c±M¥W,ÝàÜ««¿¢Vmù|	Ë·wj$témè±°&í9yòµfæuC:E@[RX\.qéuDýé(iao»]W5?I!z®¡±âàkËý¼LóFµUM¨cEu¼üÃFÔì<@y´ÜøÆ#y«µàdMå@ÛXüû¼á¾ù[CHºÀ[4ñ5z:ÓàV[BÒ/I!ÕÓÂXj«ýH&o³©sFÍ&-ö«7d\X#>¦yñÜÃMGc~#!Tüt? ªÌ·«á¨É»ÕBms¸Û®0úBjÛ(^ÓÅ®¤ÛF¹Ðma)'¨ë(²ÄÞÍm²¦á¡Bá|%«L¹a\×Ub= -f®¢Ü¢«GÌSÔxÖXcÃÈÄh½4e#"';P	>Rõo;%t ÐC$g%Ä>70* *©cX!C7yôîËtO'j?óíÛµÁûH= IróÛ= kòwiJ]]þßY÷{mûpLÿÊeLA¾À <½åi­WÎ?o©t¡caâB¼iBüÛÚ¯:_îOJ7"\¥^­EPHQ¼Cõ *{ÎÁIÅÅ$ÉVÇbo]XÆs)^H²®wójÔÎE6OÙÿsRÍ¨Eùï¼/²OÉQÿmå«õØÆZa;Ä{ <}¸°Ró=MÖ²ýÜz´|´pµÛá!cïÆ,@zÃT«¶d³åoÙ-KyÁÓ4gß-²ÂxÊØÏ\@q&}eÔÂè\ßÍT1Ï\ kì÷Úwé\ÀÄ~<à¢e«4E¡/«Ä­aõu½=}l°ÃNë/J­å=}ÿ®!.N8Ær)HÖ43¡C3Ôz/N:
-Ú7!Z1Þqö)Mî½%"O7^+TÉêaF 8øc2ú%ù3}Ô²dU(³ÍZÅ±£y¤af¿Ï][Hþs·Ù$EpFæt4¦$Vú
-í!h ãV53øKéâ=}Nå22Úú"AÃ5£áª6WÕæYôÈ^ AÜÍ)ýYÌúë¾a0= ºvéè:7Mô=MWsE²£²ÇL¿òÞ²Ü³J+= 5æ+,>
-¸M÷7jè;/_ý7ãzÈ)D÷·Ç4*È#Ú¹"ó­!z 0	º®µZ*ìx®
-R>sÚýP7:Â¯ZZ=MÍW²Dê6Ó^Nq= fÍbN¿VþÒª£;û<cVýîåª6§7dËÃ-²us¶Ò¹%·iÄs4òf N(á¨|õ-yZ$E)¹ï5¶Wí]Q\·1U9:[-zQ¼É7÷/þiÉõ	¿«Ob)Iµñ0
-lÁNpÊ¦Ë-+Kfø»
-cù@®W¡Y,îuC6ZK¤éÏ²µI=}= óáÔÁ4´-õfÔmõVÛvFÞ Àç*=}éåú6î®£³úÄßy'GD1dÕ±È"x^ù1)DÚ'ö\©^6§ö_³îªZ|¾S= @$^*- 'ªÈÄb7ÎÜt7Z4©ö§ÉUhY{ÓÚh£	±TÞÁÉýÒR7Ë¡t¨<#Ä¨¡@EK7Ïb3Uri)åw=}ø»n#MMuåÛÄ	 ¼ü÷´ÒuâÆ8¯¬»R6I¡WBòîtnP=Má-0óà¤ÕÆ+¯KæÛcâÑG½þÛÀFä7"ATMáu+mø¼?Ó^Ê?Ts÷ÁR7ñ³!åogã	_ËRª«J$¼­nÇ	h ýõgcíÿ·ÅºÊ§~Ì= @<Ûx¿a¥L¦ÃO·òi½ eûÎL~tÞ/'­=M$x@½tZÅYÖ&¼£]6o¹åÛÑvàMfgp£7Ç6ùßkØ5i>9àlÊ >Ð7w)ý;³(JKLª.z7ðfê2jÐ"£.SJ®.çòìV\3(ÎÍ­Êt"´»µ¾¸[
-¸8÷Ê+¶AúCñ&ÿøH]÷hly^Îàî®ðgåA6íKÊ7ÒäGo¿:¥G[Åþ¡«a¶GÞ¾!â
-=MnB»ªÖ1ÔIZò2»JkëÆwùºÃtª¯xÇ»×ut#jà:æîOÒ6P¿èrñË×ôm2¸ÓJ±*h«koâ}îµ»¯£F÷§÷¸#a®Å.ùÌ/³3Ú9VÏ[³22L[Ó,ö«W&$/UVq*	fÐ;F°®/Ñ¦·qo:SCÚÉ¼ñ|¨íu09é±|Þ'­ÏYÍ. 5Cm;Àúñ=MmW8ÒSM³¦äHmsA^mÞ¢£Â©}oO21*ÒÃÊFbäT~¿P'7ÑDØÖW®äO{Z»AØ;t£82Jb^:®ÇOß­v@r*o:×>·ûxGÌt/ë*F:7ÝÁwd¾º£D´{¢= ´¾3EK·<MÉ¿8ÂìiÔÁ°r6Ö!F{'H§Ü
-y¢rÍn(2RæQ{ Û»Ìg{¸ G%~»¥QÜm$BË¡[Ú®jþXè59[ô
-âRAÁïywìüwrz)yhX#p¼èt!Â1~^ h6kî^C6}hpB{£Q5x¿ÁoÐ= à £É<ó«¡ìè31ÜÌç±3X~:ÚÂS~«3/÷9ÚJ8Æ~­^\¨ÕÀvÈØýd9zX|ÿ1¨
-= S^bÅ]É:×l÷EÜ1= ¦¼Ê
-T4ÙCéhåìcÅ»èZ³}!©ð:~^¯ãó*Mï8rÚm}6S3#ùÊ(%òYï¬%a¶¯N½
-ïõ­î/Q	½É}I£Û£þ×ÍLtä,QMÊÚ0la; {Z½¥{é¹3§£:Nj´¸ÆbýÖÜÊÝizeµvýEärìY(£Î£Ô¾oþ39hn,9øÚ¯úõyä¿Ôb4q
-ÏTÊî·ÑÚQÆï+zy¥0ob;¢Àï­üÕçIòõ[I"îY°âÂp×AÕ	# }êN92Ü'Ú=}Å®Õà¹Xg[9ÿÐ58¿Cke.ÓÏ#êzü=}ÒGkÌ%Æ"èÏ^q±R3
-=}*@Å@¹æÛi r·÷Â³¸{Ôd«WÈHÒ=M®Ôææa!RqÄ×óÁá¯SÛ®?Ãëê ¨.ÃW §r+TSóÛ5_µ®cT8_WqPãtå!Wü= ºmµ¬È
-Ò+Kq¢¢ãgõ ËÁYbHG@¡yt]NÖ¥¼~0X+ûx85&Bù2×Ûßoç¤A:$'áôÑÀ9º|:ª °­zï:­$Jo¯«ËÜÛ÷àSWîK5´ÁË$fÙÓÂ¨ÃÞ1£L .uïÇ-ê{Â¹/&êÖVÆcí[>£µØ¢ÅµûÈ{-VÊm_°S³òÀmªQ©FlaÞñíÏW¬D©lÑñ)ðss½ÎÿVBt	LªS+¬KB\;ªå'þmd'=}ÈnÊu&þÚ®4Ps±ô°ñZ÷¹(ÌýlÜ*M»N «Ïö:[Õ.lrP½0w¬=Mâ×sWíQx_ó?CA'
-ZW-òªi±´¥²ÊMZ§ædÀZÐùõ«óZófÉÑüÔè­\rNÀóV6Á69f~6dOgD	Ð¿o>é#Y¾u?ØÞØ-Ù±¶WEÂ¯=M^ÏèbÈ½qÚäqjr½ZmFïâjÊ4áÃ1XÒ93OÊ´YöcÛj¥[Èñ£@!9+ÿIübFu#PB©
-DÑÌYíuÃàÓ+µ"8q1·ìÚ¸óTü-¤¯ïiõæ)êI÷ïÑýÙ¤£.Ð£Û	P¬A-|¸ëu¥ätj ì¬ÔåÔ8O¥	§IØqÍB¨|D8xò)ºmÕCÚßÒj&çþâ&}D#² ½Af9« ÛÐÑWï^Àþ°w4Ì÷ÿäÅ¦ü-yÑïc®Tú÷5YQp'ùÆ×Íçj1vaî@;åQÃÀ~¶´õ|}ñh×ébÔF4\BÂC&ÿé>SB0qç=}¤+«mÜp®¶-[j7ÈÁ­(bC´=}CÑ¼±§ =}Êx±µn!üÍ@je ¾Új¯q!Ró6×üv$2ÐCÿÞ2!ý^oäuÏtmQ»ý)ËgÏ_¦npËvõâ;þª«âÍ×;sbûûoD³auæ³e<=}ÿaSªrýô:kûÜuü>YÃWa³'ÞF{À¼ì ragïÞP-n£íñN¬Xª½Z43<yþ²]¡a®ãK[³'·	h~ÚW6xòv2ß:.Y¢vÐ|°3_+Æ×@8±+p e+©Æû|­Ã\|.	g è+âT%ç#0ÃêÛ|ò4Õ®ü= 6©Q?Ð¾ô=}Vnqæö«ø{ÕÝ­£y"ërkÜn§ÛVKý¯«¼2Ìäí½÷Á_9¸­O$6GÌljÜÁªYý»ï#ç[Þ&0¸5á# p*zÄÉ¦/¦ ßõè{»ú-%Ç.¥	×¾A?Ñ¥m0!{eõR,nÖ° íe .Ë= \pÈÞ=}4½²N\xÏnYÏÁÏ®»Ö½T¡Ðº.^¿èÝÛ.@¸u9¼pÖZ¹ÞÐöxjC%fÚl1	÷þ¬Ñ­qâ|Tí*mc~
-4:íd;8Å"7Jî^óðP<ª4ïîrØ¶gc
-
-m©°áÔ ßjf+áÁC®êAªiO!Ðp8!1ÇÒë-Jö9Õp+mz¸K#ôxpGS øQP@c1)Ó	¢_·=}ºøÁ9VÙ£ÞþôbF0C±ózHþ,	ÏÊ?dgºPÙ6	ìÒòÐMþz²ÓR½7d~t¾óÍw¼äN×3lVªk	·6­O@*%1ð®ÐùãÍ¸iæhÔ3é6åº¦ªÐN:A6xðéÝË =}¾\&¿§ß<Í=MS¼Ê¬ü8â÷/Þä:ô*4Äê¯b(çi@ñ¼(|«¥M$.'i3ÖL>\#qkºýþé;3éyM)"N\>'?9.Û6c7síÒÛ)°tU9QA5zòfvèð.+þèÃÐg?»|îb$±)|9äáàgJaJù[ÿh:©rÎxò¼ÿ*­ h5z«ÅØ¶KÚÛ¯èß«Àú½¾]½íDØÙ¼mñx½E¯T£E·*%eúÙ=}å>òGG7Õ.ì(ö,(lÙ³¶°çÿßrê§@óOcZßëÏ/m|Ñ4J­ô-@dbºX­þx.I*çÃ3éÙx9dÚ*zQÙP;Òönk·µ×ú­¤îB@ÇW[3îÉ"­Lhó Y["nÌH8<^ ¬ =}µ«|Í±^·+¤¬Å/3h^Óìçç» *ãöø5a¿3uýñÌ0 |jWp.mÞ.MÉÅw*iìe|î¼ÂSÈÊWÒ£éÜLbé4^&©SÉ«°çnx¨Jg­Ä9°XXî=MñÒ?Ñ¢öN¿= 
-AèWÜ õþ5¿¡~ì "3nßÐ×¿â¨Bª3ÎNdÖb(,,âÿé®wä¨Â[ þ4þè|Çaán?C¦°¼è{Üsîb>ûåxmîNúÿZ"Lß+û= ÞßOüwí·¨î®Ü_Rä± \Õì±g?Òst¢ÌcÂÉ,ÊE9<{{ì20Jùl{JDE¯= JõËaÿôÀbàè±Ô¥hV>¡%á:Æ¯îÈ%E3-8ð= öüönÑ[Q_fTpEFc½´ÇÖýc§PÄOOdâ+IÒR%Ï7	¦Ãe¬ô®9¢2Ù*4
-EòCñÔ·T¦aG¯a*1HOX®Ï=}J¦¿JæÂ m¯J1«uð¦JJw
-ÄtÌñVÔkMqÛÄ=MTÏ&ïÌÒ9}¨ânzìrµ³¤ñæ4lÔ=MÎ7l¾É-¿oÐwàâf¯RìàÅXÿbÃfõÈS$y^x{u=M~ÿõ	K¸x}ÏµRÌ&¸ÿÕ	Læ5;Â¬©Ü¤{³«0{ÿ¹g«êD¾ÓWFäQ ù]±koÊBÖUÁ!ìörH~.LHþwq>nGÂSÕáÁÜ´';§§SÕþïM]Ê"p'­ÚÅÞ«äÕãZöêAè(¦7fa&ÁÜ´§BçoGEñ¡SÕ±üµÁÜ£1;Þ.t±aJöL¥o:]ôáÉÊ"¨ªhì­*GÑ=} 1ÙBW'(ßk{­TÎ¾!ñi2kË¼´wô|&¤Õê·,Ú=M¡oV¡î|8HÔùK$¥J(mËßÝïOís¹Cÿ½au^<ï£Édó/%í²Ýá'_dKÉ;æó} :5­®Ì?9ÈdÒ¯Gúa}{=}¡bG23bØ26Þpâë@QÃÞoÜ«í¸Äî5ß:¶9¹4¨·ó5}A·~¯m¥©ªs{?ÓüôZ3rèzÔUª¬<ur¥}uµmT{~c3!ºù(h$ÙÄ5!8Ýö¨ç½ý½lÇ·ü^VfÉ£i§³væ·3Bm;«­ä³ãVÁ©Òò"³ñëíëß§T¬ý¦CÝHéôtàÔ1¦<¦e¶\qÚ$9­2¦>-oO
-!ú)h;qS£Ç@²äÃÔw×Õê99©¯Oñ^á|mæé4´áíiñI¥\¼)±Ù=MÛÈ¦cîõy4~1uh\é=Mòðs=MËhç¬¹Ã§ ¥Ò$IºQfK·|ëpÆ©{Ù3?ñêÑKòV¨ôÿ½ªÝyÎ'¯4oôØäï§cXfy¬q: <|µÿ9$9jÒ[ÙÌc#KHÜL4&g|ÎÝ&°¥ô££Öþ(µØ2u3:¾Jptjb^/X8½Þñ!°.^Î97ÚØ	úÉcDÉP0óï>Ì~y5ïÍ{ÿgµ'Næ¤ö¾+ÙÊîiìüXRjàF1Ïñ*
->>¦s'ÉØð§ãñ¥A<uÍ'XV÷Fd}^ÿÑILÖÓAÅÉL^P?Y©Oð)]i$pÿõ}/Là)[­Øk¹Vìå6ÃÙYï0Iß#³{Ç(ù*1$q?àôb;MìÁÜ´§=}qpGvrH~.Ó½kGòû1G~.pklGöÁÜ´'ukoÂ¤\sñn}} Ì_ÜhùåÌ7oÊ¨»èVÁ!ìà£YV½èTÁ!ìL
-kïF1ãËÝ}ôÉFàß2¸½ò¿áW±RÄËÐðãó¾!òýù©
-N~%sL¬cv®)iUïJ«]R¸yJr\xÿö\P¸i¯e¿)JßÌÂM§ÈñI
-LUz¦
-1µØ,5ôq,:
-EC0P$Î¸>Âì¥ª+8ÌÀ]RPÄ¼£cÎü´éÿôÚÄî?sÜ$ÿÆSÇDô¸]O yÎ-j¦*<a¬ßÄ±Ô)é)%ÙéTGB>]åC½;DbM_ìOÎOCKà»O cè¸~)½=}4×«Ú¯Ù2=}!÷´âø®&Òsªï6³ªh
-¶**8º7¨;Çÿ2Ù»ªõef^n^n^^n^^^y iµÔÙ÷Ä>ÍÒ<.ø²±,À6<
-.VRF	é üÏ@¢®gsÖí'UQ×tF	×@¢¼@¢QÜÂûd±ûxªÐ	ÉäH§¸Ú+
-ÍuBý*
-¬E¤´a#±¯uÌyÊQåÑÏzâØåj¨sPðÉðn± Õ¼£ááH¬óGsz¶5$>àAÆbT§¸ßäÓB÷ûÀË{³á½À5ÍÞæÓ­«Éz5%Úþ±c*|ð)o÷ ·Kôàþÿ~Ùc0>ãvP«A° K8·¡¹ÚªÑÖ·ùgÆwÆÆ®,céuÎæ´ò'ü
-ÈeÚð?enojÉGþ±âRÙòõòõ1~%îPozá>zwVÊuR âÞR[¯¥J%ÕS æWT_Ñ7ËWø1*¡=MÀYµ:¥ðZ·üø ¦Âõ3JÂ5ýü¤FüºQÒªÖ êBvQT²ç)Û
-%çI¯«ù
-õç°|Õ	ïiÛê~b¼ZQ&ûÕN²ùC²(^Äv¥Äëk
-§.øÇü
-Ð|Q= á&	!I$±bö½Âí9îmÔ ¶IyÖg×!Ä¼i^(¬³óx}5'&¶2ÎgL~à"ÙÏã^ðãD~aíBÄøãS þ<@4¥è»iäb#ïèUÑUhèÏìªL[ÙQ]©â_Hi_¾°Yîµ7vn¶ieÕØÈF³Êå,ètKýKÉýBS&ØÅw»0¤ÈlûÍ¼l£[= ø5»]a8bÈUÎ-,zDÜ«dÏäsQ
-¹.Ýõã¡co$'ð§ éÞT-¦æm&Ã±äÄ1ÊÉLC|($àÛCØ³W/¸âÉÇ@âAtVb¸5À
-Ý%ËÞËÑ¼jÀß¶ÛN¿2âaä_oÃ'°^ÓåÞpòÏÏýóJHð¨6ñ  â×xà»öX5¯;|J Èº©(SèþÃ³MZìÞ+à#·7¼£W»©6zª ¯w±ÆAHcËæïøÝÈ­ÐF[þ\Wñ£Ò¨Éýóª<D éä;$-=MõmN·çeF³ï²½öaÎ­X´.&ICÃ~üK NßÚÉXKèa2C[ñëÇY³ÌøöµÀvÞÿRë>SJ®sºîÜwûöHÞ [8Y/£ä2Ï¾Ör÷2ûFI÷@+óWg#7,åûd¨×ÞyµOÊ wë¾B-~ö×/X3Íè|êÊ¹"Ê.A	¦óöDYêÖD J»5èI0*U»}:]\X]*»>Béúûücv= }#å
-âËª27,7]òÛ¼ìñýWÅ8'¼êe~»7¿ªFËruÃâWë	Ä«=M= ÄÏÓXIóoN8->Y/~6H_­Ð¥Ä	¬ª¢c]d)Málúr57§k~¼÷aÃÍL}WE;ÄÛG~Mêæ¦·Å'D^ñ<zJµ,ÂÅ8ùÈ©^Î¶Ëõihê?´à¿åh÷÷D3Ô2ëhð"èç°í½0°§Ä ëPHà:Yjuû])²®ØXÞÉç]Üiù±Zp}ZL¾r
-Iñ>ßv¼>O¡W}kbêîô¡AIØ²uïÖãíå¢Úpv¿!_ÿA¬¡!òË51@B¯~¨QÂQ¦G<ÜclHôµÓÊ¶=}©T¬3*ÂDà"ÃsI&=Mî¦ª p"EéjÊ;ÑÂ}¾¯,¶.Þ¦òò¸C!^kLØJ.Ð%~Á:Ê¹:xJ'wµ+z³TÊ%	Â+6zjx¯4ÂgU¯¬ç¨ÀZdútÚ=M¯^U¦rNPÔæO£EîÖ÷i§Â*ÄZþ^í¿Þ£|þÁ|:y&{6g(<«K-Y®ûðz©m-zQD¢ÄÃÅls(Ù$ÅK-ë3Îe´Ô j-¼µËüÍTITÐ)¡âZWäV­ëã>Ûß#ÜÆo3<= 2Ó£¬è	ZtFtLüªó#Å	Ct-é>¯¤Ë$¿ªBex ¦£õÌ!Ég©åÃ¯ÍB~Å4¬}­ÊÕåÄÑc©þ{¢ÆTêU!Ò,Ph}ä~ôçéU©h½Ð=}_0©ïþFn£k¨ÓýVFéýïc=Máv-÷Vn= v¹ÅgÍ¸^*5Ý$¯rÜÞRÄK&ÊfíåÃKÈÄA¦ò¯9iië:Ù0´ .V f$= ¥í. òùØËMIÆ«¦Ëý0ËõW6õ	8I¹]&kóNgì3Û¶M²«hc.ùN= TF%É1=}Ô;ñ_Öº6@Z² îë¤pò6]©rcºa¼o2ç¶á¡YçdDÌ±H×6íãí/f¹°Ö#Í¹G=}Ë¬Q°Åwõ ùYY$waì ÿ¿³Ä§ß³º¸xù4ÐøÒ¯)Ãé*-±øÐVöFÃ©ñ#ðj^´¬N Ã{þ0ø´-vHDå)LN¡ñ2¿ÇIÜªZ{Ñ ë:B6ßè>Ø=}ðaÃcJ-Á_ëâÀïþÇðÃ¯ð^¿åN]ÆX¦-Ô¼^&¢j~óFÅÜSÕß¼l bR»BØöÂÍ^<p$k(kCÚç§=d{()ÌJýv\ e*XÉ!¢)XÂ[¿ëö Êü¢JãÛW=}±«öuÃ¯^TÔâ«9¹O$ßÖY°LtZØ= qåN2UÔ}îÓÆ¯¼ÉÃ mÉM1g%²½£hÅq]÷hÂÂ¨oÊ$¼e>B¥]e^Ñ'QÿL= ó¤J¨yÉ õ<ÛJDáhG ³d[bñz-wWªxýÙcöcÎPÆx|«AXÚÎÉRLæ3cÁ+ôä\0Wyâ?î@·aº3z ¦ÅÁp³=}"	 Ë=  L0¨ÝK¶Úõpi¬Y{¸#ø³[¯zãBw¿øØ"å³ò(mpß³=MI-Ûp´69¬°Âe<JíªíXy¶)kô0¦8»ýmIó%SÑ'Ov³]ó§S|M	òs z	
-ËÁ..#ç¬A<ð<£ãOà'Ü\ò§"ùxÓh*ÅPC~
-Òá(a?-ÍJtUÿU?=}ó
-lÖöa­ß.Êl.f#þxñü÷D²WdÀTæ7ÔÁ'r¬Yï6£ëö&©ðÎ'ìÎð9(G©òä:·kãúñêUàs±=}àÛ¢Ud¸!;PN4RÝõ EKå¦í¥ë iuõ½ïÕ©?sx&ÌËjï=MÍè£Ï zÞ|\Ùâü%Ó§¿Ííà±Ço³×Op{vµ²Ä=}Å/Q£Ig&[UèY}oòÄ©.¥>½öÔ½ÃdRN:Î]åj­W'ÃYÒàßEqJòuJtBédIvRñyÂÖe?íb{ælWÆû°uÙ3-ÇQîfSÿK²sÉÃ$mm!¼MTª(·Û-Cß?-\HXÚ=M\é¤JÜô¦5ta,}Z±Í¨JÃÑX¢¨ÀÌÝÈFk@ª)ÄK®YvÄ}<h%&³ÀCn¶ØEß#êöp»n¬ÉäNÓ²WA>t@f½loso{'òÉÎ·øðÂ§Å¶=}ÊûNJ%ú/%:pû¹=}'µ»K'@'! åj1l?3XF<·Úå¯nûÜ¹jAÎFë »è®ò;1û Ç÷k{óvîæu{°q±ûL WùXöñKnî¥©ìM¼0ügUi©X²{¶vÒüËuÜ| XkÛÆmø÷af?÷°ªBé¶@G#fç¶ÛêHßQ¨õÒ±Ëà¤à0§H¿ÊÑÌç* WyTf|éw¼½2=}®
- ÅÃÔn­VãoM+¨±fZò|ws´+çÄ6Kd3JÊl¯Éf¯}ïÄ^Ì¸¸8'Ãx[V ¦õÉ&+Ó\ÚÜ]©ÃIÄ^©u]3v'?êIÁpSymÒÙQ#Â7sæ¿¿ÕÞýèIt£1ªÔ=}Xàv$Õn¬Æþç-µ,Qñ*À·7wÊ¾äû¤z°á×K¬¿ÐtÝpWÌÄÌÂT óBGJ¦XÄÐÃkÜ^étpï 3·Mêo¤"Æ»(­Ä~jr¦æàè¨GñNß(1.©iõË=M©ÁuµSKù¹ãÝÐ ~ä¹s;©êÑ¤ rw¶O«m¾ùéÜ¡­Ú¢ÒÌ'"°3³ÿM{v*W¸¶]¿ÿôèxBÖÛO ï= ;n¹Îf;7:ÝÇ1½cÞ¾¼W+Ã3¸)ÿRHñ¢ÞÙô¢¨çt[¥Æa£hìl, ~ËäÔ
-7ª=Mû-ÅàêÒxýað!gGÃÿ³Ë_½)ýÚÅÜ %#ay!WÔxÀÀÝåTíÏ¤¹®ø;(gU¥´(ØMÈ²:gªýü(Ï0BÝc×éË@¹¦jÎoyì¯¶'½a>õiKÂÓ÷Åc$ÃãöËûÏy_UÏwø{ÿm«9 ?cÞT#Mê8=}¶Pôì_#µýì7¼c%?gÎ }ÕüéÖÿmNÐiF(ãqçoxh>Nä«Ï¤&ÈkûÈ´í´¿ªÕn?èÀ²ÆÿÔxoÚi÷ÃÚ
-]Ø;$3DÆ¼âW2ÚÝ= ÃBdQ}ø±W¢Ü ZUN×©ð´rr+ËÏ²º$)¨à>ê=M&Èt¬Ë,º/ê|ÈÇ*½U®î*¤ïßÚ=Má!$92ÕávJä
-°ò5gqa:#D8¹ÈXqøë±Ã:°:ô>+K¨U°*YnçÑ:32ùuÀ"öë%KæP¯]vÎ%¥§Ñ×@üþ±Y×Òd!ÀÚ_¨éH8ÄgÖíÙ«´äñ«TÀW4*½
-4G?ÊRÛÁ[ý©L@§÷MyjÐÎôzG{¯ZÏB¼[UGjmGÑÛcKÔÜýH¢>Qì"^Ý,XÇÈ~ÿ[ ÷âÑÔ«Gï/ò[3Ëm<¡IS?º+R|+Â¾í½ú¯e3Æ¡½úC½zÇê@ºÌM7ôx÷cC9µAç_3ÎRÉ]ÃÊÃ}üò¦?ºD9^zÎqü:s2k½¸|9½¨´x!{hÔ_iû7-w ýsÅõ»zz¼S R÷-²ma½üDy~½E
-Y¶:qgWýURDÏjr¥ú>ÏüP²¨!ê=Mº_¦ækÏ×¦ÏÃ§Ømx	,17Jds!¥á¨mòmý}ÉÍêÙzZïTò%¼ óõÓµÁQ9Ôõ= §òUB~Üáìsæi_.zWb$fc+îÏ$vD3ôì	i3u	z?ªD/9k¹.r¬ó)£êðY8ü¸£"BÆÁ£Ô¹Ëd¬jhôc¬¡GÐ×5u³Ð5è\é4-ÊsàlT2ºá¥øÉÜ6n6°Þbpw !×^ßdeÛ,cg rääÃqÈ ·1¤Å^ o8 ®â¦dæWÂßTÎaF1sºíD¶×ø¯
-Z"Ü/èïúÝ aè}ÅåãòlêÉAîÄ<óª}V=MbÏ>OÉl¥+ì'U¢ø¨Ñº?ùZ¦ï³»ºÛI©³+ÈuóÒÿ1,Üë¨¸Ç
-Y=}Dµ¤ç:¥áTdL÷Ï ï¢ G4¨Q¾îm1ü-ôîûYV=}æñoF§É·mO¯¯tÞx= ¥(ôÙ¸	ðXå©Ü5XF!mã^½³'5ÁïF×¼å×eÂc­kyß<QÞ,h òo·âªãÁêº4:¬kçÑÖñÂãNP»QÑ Xy°(¯°ºmö8tb[°rH]=}d^ØKäà=M§¾Ûä~RîûYpã ¥A©ð©qpµî3 (bèÜÿÜùêfÝÌ®F°I0Hê²'/e¶éàÞ,Q:À)#Èi=} $\Ê\ÿù]Ì<ÒþMÆ¢$¤üo1X¿÷9ÇHLlÑkÑÌØª6uG¶>²ÏäTÝñvÔÀwRa]÷pxZì¹ð>ëê¤÷ü= ÌJvÚ¬ØAÄáÝfçë]þú·ÚÇVêym3pÊÚÀDzÇ=}U"¾îÇÐhP8ËÂ¹	r8_ûL.ÕìÑ^ªÐ%	¹òì¥¿4L[ùÉcÛí8Ä@Ðhå1HåãYf¡hê6&ÈÔ¹~åAÇÿ¶ìï­½,iu¸+{
-Û0Çóæ8ÕãÑ¨z3z?Nýhg1ç^7È·= \ØwaV5QÅ¥FöÒÂÇ©Q'³%cogßgÓºÂò8_uÚó.Ä¹S¥©*¬h´þ¯¬²v2z-Æw&[ÿbIû^>;?ùÎ««nTjÅJÑQëóÈãÖ_öÔHeÞ®ËtÇ¤SÂpnáøó¿ÌuµØ~YPL½y4æÑ;!:«¸-ô"=}Ò±§»X ¨Ýñ¡Ì§>Uâ>Yã¾"çaFfe´·6e.Ã$NÉÔÃ_ü÷ÛßË:ücó'¬ð[øé.àú/hè#Nyq*¢½ûÀáÍ¦Bq!9;ögMgùÊ«®ºÊ$£ûÌÌ¤K[Ïnv(ó$±ãâÉÏ-
-ú{ÂÅ,<ÊT8ö¤ê}æõq¤!aü:Ê¨Ôû\¹I}ëT5Æ\Ïiÿ0QEïµ*ñKh7b¾gæ'ÐÂd[§hsYàm£¹KP®pýîöñè¼¸[u/Ú¸= Y6 ÀYu÷²ÖÖ]r[7bmj¨'æjòàlMO*Ç·¤ñ1(*TÙZûÇIîiÁþ.ÖûS6Õb6yYìÒ$©iêãâ{9DÖ[0t*4ÿÐzº0ð*µÝJ7ÐRbå§ G'Ká
-è2xêy­.êä:kñnËÞ8ÖúuqhÛâ|èä(Æ5õ}v÷êÍF=MîXé³mî´ü|pî´ÌõÆÅµÔ÷)jDoL¾6ücÖtÞÔ,Æ3 eð_ÄÏ.3,VöHDNå@ÔIØhÈ1¾¸ô"§wt]Càñìßï÷\kò§Ëk¡áÛØ<vÐJÞQi[ÂÇ¢Nª¹á¥¹$­t¹Ða&Á_r5×hzM8%
-Îf93é.¸E¿ÒZ_=}Ì¯Üµ±üù×fó ù2½NQXEÿZ ìt«î9^z?êfô0Hf4êêfá¤>P^^'­Öâhäª½
-à§÷ÊZ4t¯.®'cÎ÷þ!%n/	=}¤=}}Ú²Spêw½ËÖPçT¤õßªU,2õVuPT8ÌÍ!YVÕ,,]^éyào7=MRÇt]= .&ùdDÒh­P\ã¨-FRÆx3´¿¥ûOªÄ:{·ª7A=}ÛEx¥=}VîAOúõL*þ¥ÑÚ¬,t .²ÑO·(ùqò×Q1 Iì(é¡U©ª_L÷¼Ü jmªÑm_{ÞQQõÔ}óköJ%¡ÚL£²ÆÓuSU#zÓ*§ºl¶8BÐ"@b3ôÚzbÛvÈdÓÌg&á­êühSÍw3È[©tÄn*\2¢¦à
-v6ßyÜ0Íw)à×èS{Ñ.Ò¦Íæ ÙbÂµîÑ<eá_ñB.½®u÷\'&nRTx)= Í=}-ûô¥Í.>éô5) 'ý¨êëçõª·õJ+mvä¯1= 9×µÄúb3®:OaÌw;±QãJt= .÷g)^=}%9Òwq9D>èÅí:9º_À$ÒÁ{cÅ?°Nzíø~ÊY8Ä)#2b°µ#¢ix3ñÈiæ9z¨ÿJæäë%<êR MÑÄQÖ2Ô½aôc5}t5ìø#Vñb	Iòj&=M¶Êwd!
-é7[ÀÚU*l6¸ïÙ©¡NIn%ä Ì%GùÑ6¨ uo·6Å)=}PíÎîT=Mìª¤){èÐSX&P2¿ÜÍvHÎâ¶Á3ÇÌð¹õ-êÂâ©s¥¾¨ò-õ£seø«OÛÝ·ÔnW@e¤l4¯	ÏÞ¾QjAÞiòÈë,òPGPñ¾wfQdSu^ïÿ+l©ª£¡Eõ£){æ ìððõâ¡ÿ¬ Ôé
-£¶p¾løw³= ¡Km=}û5HàI§Ò%S5x÷i$¡;ÈwßôRxfaðZj&h6æé+4²èþ"ñ­Ð
-ú¤ UÚªôÆßØ°;¯Ê¹¸ùÊ§ÈÖßoÑZ!ÞôÙÙÊÃ¾#·/ÙÀ#P±/·/}¯1®¶¸zÉöóýaaâ%
-â]
-÷^ïCÙã¥þ]÷FvÈ­ÅHÒJ÷Ùñs¦ÖGúìtp»²Xæßñ 3ÞF}ÃéD½~Úkí]æd®ã±êµ×èÑèq1%¹ªÓåÌÇ-ùµFøI´ðìeò3ëí
-#1ñ)ì)Þ÷ÔÊ0­ÐÊ­ÈÊÐ­ØÊÝ÷D"¢×û>öÑ X>>>éÍ5u²m¦Ìd lÏg=MFSôSQÄ@×¬Gó^Å£y©ZIdÉÜÌýwË}E¬G0Tò0RñSòÜsÁ¡¬ßâ= É÷Ù¨+­Ò_)Mv«<§(ÁQbùÀÇ=}Þk¨ jl¿Ð±ðØ÷ÙjÕ²"éñpÑ¤ûØ±¸Ø1\âÙ= û÷áùTn¯8 1¢:«çùdõ¦ÖÝ'dd1&"w2uù$Ì$Ì%üÕÉïÁá~E£ÄâÅ¤ÆÂÚ¤ JÙ© ¡¤î= Wxòý%=}QÚÄ­ö ªÖþopgÇ Xr*ôMR#ìmÕ§Íõp-¥ÆÑaòÿL¼ÿÑ­Í±P3; Â^W])³Ïãþm¨8e»êÈÓ=MJ­UðPmr	¹-=}®	Äy H LúRX(,Ð:= Õ^',ÖnÂ¶jØÜiPW2(Ò7©<:4Ê:2N¸ÍÊ8²Ï.ýI4·I"k¦$ôq{ øâ¹f ñe1hªQ¼[_é2NÈ´jQ°*YÉîÍÏ¾ÿÑ
-Ív@Øiú!zÚ.>ÔZ³b]@ëú²çÝ+ ÑFP¹»áEZ¥4ÈJ-Û£-ºzUØÛq3= Å´Ôw© P±-ÊQÊfYcÊ×Á_~%*©{Øº)àÀÒ÷ø'Öd¯Ý²Yíì»Ço!LÍ9ËË$+À5)O½È¯¡ÉzØÊqAaûÔ4IæÊxâ&[CÊ.¥iÂw×9iW°ÀC¸(^'©ÇÊTºL±uvýÀQÉënðÈ¿·ö!CvH²ÇxÎÚÉ5ÒÃy¶ôÿúÍÅ-
->ÉÿHìæ U4Î¯þ§½ûmÁÈÁÈ&mGx¹¨¾Tc²Ø
-ª|ð(JK¡+BN©ÅÝácÕ®O©ÅÝöd}´sã¶Ð©~Ýî#{µ/ÅÚM8özÂ)$WÜbªÀß÷ÙÏ²$Ì4Tú2Ö©q¥VµCÙ%<PÓHùQ^h ?Ü³óÞ38_Ó:Mu´[@®2	È,q~*:Câ©µÏ¶i¡Øb´_õRàag÷ÂÖ£á=MIÃ(\|MdX^¥dÞH¿¯¨®ÎEWöroODlÙ¶£¥²r±íòq%@Ë}\âÇi"PÖ àÂôÆß®YZ¹£Î ÞLð'7}=}:¢ÿÊ$¬­¥ßÐ:£v| M,¯ÚE¹y5§ôLóx*Ó¶¢ð¢©½é®#;8@ðn5;UI¾w$"-ÎÁuµí±ÜÚ. Jû2¦ÓBì+²¢!QÈ¹i¤Öù¿ìÃ ÿ¹·QlBa!¤kh)ý¹Rª¿}I2gÔ×BÔ¯Ï¬ª/@õ¦*;iÂØëÞpÝ= ÝÃd$= ?¦OrQÐ½Ì"x¤ÙR²fòW*s8|¼¸2Ô	õ ÂcÔQ´µªôÚ<ã6Ñ?{Â j®Rj(ÏKáWë³½ÓÛ[¢"kaå k¦Ðwï­±bëýF¦ÞàYvôrH¨Z>èç/Å¿ËTtºã#:}@÷æ(2Ö}væ } ÑØIxÕ¨NÏxúÿIMc¶ÒåwtJ»Ç¢Ð>Q{Ôòh.ph.ù¡]Æ¼Ô¹&¯áMÐy]­LÌÆ¥µÿ³·á*ùPwãSÛ|">4·[U8
-I®ð,õï4\\Aÿb5+]QRL&5ãh£\ÆE!s1ÏÄ±+2pÓôÏ9¶ÖR¡¶m)5!^PqÏRf%\hR'Ã±«òSßîÃÍH3íÿÌ'RÝ¯þÙJñÝ©\\PVQÞ{ewjÍî=}MåuçbÕõ·Ð?Âßmì\¡2Îd©EG¥G= Ê}-¶Ùw¸R ¢zy(Ï¡Xê¿q½ö±»ýø6vÞÄ7«¨¹Ü	Ø=MÕh {çÓ]ñ1)%Ðj£TNqõ~r¥à×õðè¥®x¹BûÛèbÍ¿õ-Ò¹Òæ\¤_BAýQ±¨4²|×>9WP®&ÊëMèØ¶&{ÑîGb¢è¦=MEèÀ¶eî¯a=MáÓ!jvñ#ÝÔ¦D¨¯|;ÈRRj"éFÅ{1ÿÏr<ÑÄwöå¾zÈùÇy© ­13'&7x.uzØ"
-Â£JßóÀ@ ù~TMS°@Ù\ê= óe%Ñâ§mþ÷f RôAäêtjõ3Iár4&¤×ùÍÜ´¼Ý|Õ¥ñ³çBä!vØéXxÕ²§DËR<=}~aXuä·%Ì Ðñ+µÁº
-%*g(Xâ±3÷ñX0ËOÊGË>Å=Md[[hg®1·D!v&/íjoô®bü= T?iBÔØ= ªX+óq6Eôyãa·ÂXI¡ªbp¬{q¦-¤É­õ¢ÀÕgÚCD®±±¶ÑN?fÇ¢Ò lÙ­ûnHê¸!zþThl¿VÖY5*Tº=M-füfè/4;)
-«éáh»¯ÜdFÎrhÈûåJSùáÎW¾^7<gøò¬
-ÃT{(êwq¥â~-ß§O yú^yåæ;íÎûPyÉ?÷øÆñÊµâþu¸|pa×ÅÐøj&
->c*Ò¯ 1½xÈ«µwSîÃðIðO3XËKÉ(tì66þ<çÊñ2J /bÝ}tä ëåq¦¸â$à±­GSC°Þý§îá.èKëí
-a/Z¸ðWöI¦(|R)Ç³ÖL²,¦ÞëJ¡±âMô{Öã¨ñµ«¯Î'~7,[¸Ì,:Ø'zÊ9WÊlLAÄÊK/x¼<Æí·1äÕ:½Ö¦ }È¦qÑûÚá~p.
-
--Ù0ùýÈ= H3Âm°nOzªxBÂ 4$o÷·V\nÐà+wÅV¬® âhþ	ä	t¶5Nþt*6FÎ§û¿¿}¾Ë\¥^igiî¸×/._'*öÃq=}Ì=M½£á9	?LÕÓ&­sÄ& Ø> :Áê7WP7'z4üºÓ.¦0àr"ËNÍ¨	°Yñ!Uñ¤¤Ó&¤0	;äL= ÝD¨KÃ÷Ò¿ëYFb#2¹ôñ¸ÑÑxì¾[/Ë·Ø¡ßy9?	7s*$OaìÃ=}ºñËÃàÏ¿ZCÉà×å}ÆÏ³ÃyÈ"¦ø7ã	L1	äÛqhlfó=MÈ¨ÐZ^sfúì¹9ÈLsrÂÝå|.Á%Jðó×zÆZ¶C÷òKI ÉÕkd
-Ü¹Ú·/vÍ6²å®v±i·4M0ñ d*-ÏÿFË Þ,X,Kîºi´å÷¹)Z6Â±ÊlãÙ, -G¡Y$Ò+þÒ"Y8/©txÙ$îæ±
-Ý±ZîÊ'bG0}av1¶µy©"²'ä0ô-^1Äly"â(-7pè½þ<Õk5}JÞ¦ýé":­Rí²g:»®ðuv²Io¥ÇUÝ{èÐ!Õ"fl.W²½'>4N¨cóxí*ÃÅöèì¼qiï	hò7·UÚ£«Ü	¬g$ÝèõÞ¨îÜ1cÌ(ßçÉå^cãÅ-%Q>ø$Î kKÿß·µØæ¬:è¼Ãyzµ.R­wÃkÈÚ,Ñ;Õ¸»^O¥' 
-ræï½|Ð:¯7Ú=}|ù¦õÇk'ð¯÷0Å·Ýêwµ²xï.WMyH¡Æ=M
-ÚÏò©ì/3_Ö=M ²ü|a÷²=MÄÙ¶We©ÏäN¹?ï×Ñ^W*szý~Næ«¤ÔèímÜ¸«óä³Ä´q9òKKZ³Û]ÂMÞÐµuÚÓOôxIäõx¼H&D'#È8Æö¥ÃrÉiª°ÅÎYGy	ñÃÐNXÛ³ÙªO2¨X¦Y=MÓ"¦&Æ'Zô2¸IÓÃw6-®Ð¯SïÉ÷À»-Q9ÅÛ¡TV\å>CÇØ¡òo[+lÞéQnU¨k®ïn ³_Î>ø9ß-§¼?A(QD]>ýßOÉªÝ:ï´hy'ÍRÔeL ÐÄº.jÚ-jÌº¤4Ò(põ§°7­>­·G|wÙP¦êyÉ[YÚ/Þ5?½³wòZ= V}Äú;5l>û(ôûíy ¬Ú}bT2W	lI7&Ò´j~®ÇvbñÁskóJ¶Â@æÞÚÀ"ÿ±
-Õ±6kVñ òòpù¸ÅªTyò½ÄE&Þë^·U­I¼HÍeÈÝ'©L½8"ýÓTÆ#PºnC6ÉÏàWíPÜ}9ÅÅhoÃ'ÃR9«x®]î *§__G¦TtòÛ×ÎJ}Þ(QjÈü³å /ìúJ®ó·ÿy'N"ÂÚVô/ %7IEô@äµ,»jlg~=}UQÃÌÉÁ dhÈ\SPbTzÒUUÔqøÖ±ÈÌGÕY.N	¾h=}ÔãiÆw{ÈèLºÒ;·$­k¥ç<p®×
-*¥2ÕÁbÆeý£³å¢ØRÅRwîé'øa&a-þ*Hl¶baiç%¦/EÐX33"Ý³êé|hÈp-ÆVÊ7= fþj<ÚgG°¹Êp8ÆAºùØ¼óU7S7hH9]G9ÑAºLAº¾úêB3HBºSrW7s¬ÞünÏ}éì·ïQA:Q,ÑAzPfô3cvüø ¥Zð>ßüfÃhÅ7 1¯ÃOEã®»gat|¸	@c¼âp³Qû¤ºßA*Næù i¸O²
-¬ÒQP{{×ºÅ¤ê3TðÒAó@U§â¤éóÃ ¤+ØÞ?Ò×â0TØq©ùÆÁ^úÜùëw©g-ÜÀ\¦ùý¸K¾4Nï×ÿ.>Oª²\Åm>Â,Ò"·ÇKU3ù²	$4ÖùÃ	ÐäO:»È<ÔøæU=}Ä¨J¥:¶¨éÚêòÏ§àÓÆx¸í0ËÜÜ±èüx"R¹÷l±Im°¾3wA­ðÄ(îB·2)7d×ÖÄê71÷·[çW.©ShêÞü6®àù°íNVR-0S5"aÄP*{ 3[9 vcXî= ¶lJ±øÕ¥4CqèÈ´Kõæk>âæiÚæo'ÇóÓÆö	3!7ìË¢Ö/õïæâC²,ZÝ' )í)¹Þ!iöFÆð¹>ïþTTwjd æäsºRø ÝI9EyFEÜß¼X?«dNö&gÊ6/ÝÁA:ÂR§5m1¨|ÊÑOë»±´=}3y½>i )JFß¥öÐ!í(¸×VcØS,£àe]ÅÛÓi¿cZäÀcHò«¹µc´ªy¾/÷Ò18 Õ÷¯ìHyñ²Öðëä"ÙÈdBt 8±YªJ2Ûx6×JÈréîe)^#!¢ê;-WYû9ÚSvM¹Ù^4<YÌS¢	6wÙh}ÿn!c ôN*5l~A¿â¶¨^2¾-2~ÂcçØù-£ò)¸ËÆªºtM~á*#xbÄõËD{ºöüuòª19NLO)LªöçªûYPô8z:µ4Çêººï¥L}æJ×U¹UJO(	uóyx!PÍ<"= ôj·ÆèÆé¤0É©òT©¥ù ÿ¡Th-íÓ½3E¶ó19O[©ÕW«IoTø~ÊCN;Ò<X
-8NIY$'ÕJ¢¡Ô·¶¨î2.b8¯²X^ÚØJØïPþ6ø,j})S¬D­ CÓr¿ÈXYìtï¯³§[r'÷tªìbWÊà|hÍj6;æ#1Ä2à
-Ï¨]ºÄturUÀ<xdS§iÖÑÿW´ÆHð×'Åæßpº<}sæjñ×	jþ0LÔ ì¢[$;3_KT%'Uì¹¨®ªðv!ß*þÒY§¯¾ïÆ·¼²·ä= <2üF Ú¸
-´ñÝÀúÇÉTãN>ås&juZ´­¼3RøÁ&~ë\rÑPÊç'iIcY{ªþ]»âæãZÐÂ+~ðZpj ZþÃ×ûÁ7îßpräÆçýÀûqEâ¾,¶éV¬tû³¦.ø
-¼æqÆQÆ¶ö¸Ó¢°ÜbKmjgøÃÖ×®²T,fIZa
-]Õë´U»°F°Ý³ÑTw<hÒühÇ üE¯ÐMë>É³Tä©lW4QJÂs©r'©> <e Ò¾Ys¨£¹@¾f¶ÈýíZ1¡DØê£Ù~Ò>ÞÅòñ2aÆâ2@gÕùñdªÉ#¿.ÙNë Îr:·Û-tÉtÜ®½¯qµ=Mû|èÏï±Ù}<L	%?g xÐÂfÈM¦Nî~ïîð 
-Ó^iÙÈÀ­K÷RgÛÅ%ÈÙ¨Þ¢×Ãp¡^gZ·t¸ã|­z£*Ø*2£Æ1ø+-[£çR°bb§8«sê,f­µ\Â±aß=}ØèÝ(ÜÈkÓÃ	Ô>¦½Ø©³ZÒÐ2uAjXø1øLDâU¼,gFV¿ãªèíB-Þs Xw­Nc³RI+ Xjr<ä-ëènÑÚå©|Ãi!K1yH{ob iµ)VÏR¾çh¢Ë÷Þ¨vg §±<EøÅ¥Þ¿/½=M³,váÂ ©ù4ûÅoÑÒÑª~&3]iéª@óÃÓKíÈíå².e,ÈþèJµôØ²'|bò6p¾øeKß(ð¥ÖnÄÝhóîú¨&ùÙîxE8ó¢vÛÈñøMl¥Û|Z¶ @ÕpÿËÏåÑSÇP²¶­Ï³hõºÜ!n¨kÞÝm7áü²ãüFrðýâ.s&ò_åì$=}U@ã$üD%ZJfo=}ó´(c×}^a¥Æ·Êâ'Bú5
-ª}"mù¼Ñü?W®ÑChÍ©"ÃÀù¦ÇEgIË´ÄÑ®ðRÕfËøA+ö©øP\GTuà-yAQä?=MÇì²Ð®$T~nÐ¢òG¤õph0¤¶Qs¹ù¶­1®öD ý-ÝZÇ|ég®<p p ÌEÑÖÛ|A
->Ö>·AäÞ¡ïDïìoàÈ= ·N¨¯BÆïìoVìá@õvÖMAã@&æÉÀABL'?Ê¾)à¢Ñ
-+oëR¡ÌÑF«nv5°ÏÙ%åiùEqÛëXã÷míQN1Xä!Hc
-"°tt­bïØ~Å>)qcÔÒ­) Òqv}ßÈýÈQõç¡.¼º|Ñÿï¦@Ðo®uØ×½|:}ÐpÜ±·ÿÖ·Fy£(Uî¶K;¦3>Y@ÁèSYÀtÛQèyM©>ÕÁÖ%ù¨÷¼J^Â¯ôtBíü³m¡V! ûÚ/QA ¿¼&Ñ/R¿qW.Û¬¼ñËÊhTÁºå{Ãâha]NÈÆPÙ9 ;bKwF[ñó+²æe²ÊWeÌ^2¡ã>1vÛÅé¶xØ÷5¸©ði=MiMH!UQ5çR/EÅÖm³Úö¬ûF¤ÑZjå[ÌrP =MxÂ	È®ãÄO/ÕÈ d¢Ø4Wì=}·'~T"Ô¶°'ûóu3ý îç&5MÉQ[7s¾¾¥©c"cë­¼'lÕà{î¦ÿVÙèOÈ
-YAM%£r¼Oª6TEú ?!©ò\Ký©1 d¦ÀÙ;Pª>kdÇjmQ=MßRD>_®ð/by©§9ËM¸	pð';hõîêe;R¤¦Ìù³ô @ãÛöa'Ã%´#= ¡¾g»ê°+9ß#,³è~>1[ð@÷Xeñ¸ÑÊ+>ý»ÃF;[aÿâ÷wKVÍÚmÌ
-?	ô!¯Údiø<f[2Ìz\Y8RÛå°CW§FÆ%â3ìÀY-lòÓEðÙ_²ÞW{¸£ ®(_4!¶WXx_0 cHüÜ|ÔÑG¦BKÑrwî?¦'Ô	Ä<­Q[YEý'ÝWÛæ8TÂ¯kÓ©z- Cîry­´OÈÑiù$I,ò,Þ¬Eà¤ÏÁ{Ù×¼Lá	ÎàæìÝÕ¾ãXòF0ã-¤·rê!nu[jZ"Þ¹ûq[cJkÏÑìö14kòo«Ûzä©u¢2Uúu}!º©ñ6øx¯ii'GBä«XÈp7)D'×æWm2[)íë8éª5DcNçZ),,ð+»­6ºÂìßÇ:Áâ¸Ù3ZÀ+¡³PY\®ßi?ns(Dõ¶ÈÇÁºëO	Ôg]eLÓåW¸1Ï",{4e­æÑ_ÄöoÅ<7?rLèÂ¶±Áç&k=}Î%L	Î¡)Q¦[õ·E§k\Þ,Rø§§	Ä×åJ  þ ALÊ­Ãð¬7Iã|X¢I=}¬#Vúo<µ;×²®w÷ºU")LíîÈÂNúEnMV5P³IH,6~)Øeÿ0¶¬= 9´MjR\þõËÓMVã¹I%-ªcöÇ.JJÈÎè=Mä ÃõV$õ1¿H+å<Tz?[«bú{·>µ=MÄHÊAN¦É{cðþlÖÑ-3Û u¶Pö6p1Y9UÊöL­£¶¿l3Ç²Ãð{¼Ê'h1yZÍ¯8ú>ÉJH¨If~«þy3³ð½Àjþ= Á«t;FÊ^	R³²c#ðÓq%Ë±¦½çcÀÕòkwé{éÿMèfQ	ßßD¥ð¶ÎSË>"ÿmå(<çó£âüï·B-]²ãñÜGþ¾RFÃbg®Ý.ì¶§ÎN\y©½öZshàw0ønÄ¥X¶ßùF³Ñ´Â¥¸µ!t\=MIÔ±:S
-¯E*t9|§äÅ6äÃTï9(×Ý«ÕôËWÉ¶©òó#í7¦âHoëÚUfðd0·hWÓc0¨\0Ë%#°´¾½f?[´ÖòpÕ-¿H uH',4\âæ/=M]=}yÌâWi¶û>lõÂÆq+IñA= =}5ëïx©ÆI	$Cùó8{Ñ·o8ÃµJ^¼+¶è"Ï \ëli)î2»B¢Ã tÁ=Mu/g~kY"Þü=}à42YÑì½ÅÈ9$sS@7ëHëï¾lQÆ
-ë¦¶è¿ÁÒeÇ£'»ïïZ4ÐzsñNùá· ôá= eË¸¬f&àÔDIÏÂ!6[µ¨Öýù«j+ad´_R6ÂÏóâÏíð'záaXD<Ç
-¨Çä	ni?P-oPæ¡¬-ÀÝóïM/Ð-¸½Åã<nyµ WL(H«3õ<4!:9Ù²©Öh+!8N¯ûÅ(zæ9B*ú¦oL´V^ÿ;öKåSëÁÙRÓE²«W_x7kÒß8ð!Æª A[ QÅôy²Ù°wyf=}4µ'g~L´#ÃÕ÷5ÈÛ#3÷1¬C= J>èGLÂ=MîtºôtRÏ?Ùôyê1?´u
-î7&­0L÷zãE¼.Ê¹N6)6?sG=M¹?BE.WÕ³!çÃÓ
-zÎä}"ú3Ö¢/µIê"þøÍ¢DZ	(ÕÿIõÒÙTIzL0fõjûNHÛ û]=M£WÐÓr@Gúi<ò,¾8bo µ¸ê ÐNØ9¯.eáVH^cxùê<÷pÂÆ¼&ÆmQ6þý¥XÖuE»Ö&´Ù<¿>Aö4K®%Ç äwiõ/#oF¦5B024¾ÞCYZ©eYêgðÂú³G[¼°þUõIkòsø0$­zY6ÒÑo<ñoå&&w÷*Px4H<Áë	rº?¯WìW®×î3¤öÚ6Ét´WÕ\.ô<¨ïmÑddòiV³1;JU&æI4A5
-9Ùz.ÖÊ¿>9ÂgEb§¦Vá>¯ËE»£ÀÉûÃ%TY%yrßMÁæ÷%nSÑZ	"¯Ê×H}Oþãmx9:M?+ ÃpY¦*þÅ2³æÏ«àjð7Ó6T³Ó6J9Ü	óÚþT2nê²¾·< ÆÛ!÷+æzÂ·¿ä¡=MôÌpPýØUb÷_â÷RãmÎ51Êï}·?þ³ógk'X//³Aþ0ËwfÌòYó[èu!áôÓ3$dY[¿Í)¯g$ÂåÈ7íHE¬ún~ÇÊB'y&LãëÅN¼ãÑ>¹µÓÄ¤50ì$9¶î&!ò8mÌh¹Yº	K/wºyÿÃ6(&< {¥á¹«?'ç(î£Ýf(þ§ÝÒwD¬]sãµDgÑE¢x¬{C[Zý>>VvÆåLH×ÝîÅ³gÚëÉÊXë§Ú?¸)Esuy¥Êu
-Ä~Ùå8[ÈÛÏÆÕ>\È´©@âñXÇGN%@ÝOþWÛlÇìu½äöÙ:øYïªpÜãr¬®2(¬Ú½õâêG×{ÈcxQ«vºx©Oÿ%ÙÁÆõfÈäL>ZUÀ¶JÃÐ$µ=MHÒ¨Ñ(Én7§4:¶¹²ÓñgÍµ_Mý'^½Ð}=M\¦E³-}ÉYâ£w¹ÉâGY\½«]=M­
-çªrò ¬&ÐÍà©îórÁAìàÖP ¨Ý°ÔìÑîa´¸ Ïë¹è{¢°µ¥Þ2x æô²âú-~êìíXÊ%ÕÂv
-ô~)hbüX µ¨Õ4~ìÑ_ÜIÏ¦	ë£"¤$#ç=}ø5( yW1Na.Ðêq)àüfÑüpà½fæ5®y\= ú/+
-Ï8«âP
-ê\.°ûé+<¦³ºcËJ@Ò0Ê°zµ$&EÄ¶ÁÏ2(³	dö©´kèqTßù*ÆÊ°óÛeÅk»)p;§UyJ¨ë¦YòOTrE÷%´eTrET¯Ñ¦0aZÞàò¸ãl²¨%Îñè4<¶E¢XÄëf¡Lð}ó;Ì}= Þ} ÛËðQZÏLÒ¨!@È¦îö¤Õ5oöüoöP â·\îÅ¢<®w}fÿ¼T¨T¨ÛÇ­Æà÷öÂÕïhvPöG6ì PP-nðþ$ôpû_~=MÃ«NXÃ ínîeÛÞµ[mª4ùGl»@i5ï9¾lX©ëîN«6G0´÷#J¸å×ï>RoîPîcV¡C.°2Olèo9	¡üGü)gëâ[¥=MÝÝÒ£â)îr|tSZKÀpX"fìà§»¬= HUmÍÔlôa2Ví9Y§¬k±W¡ñÍjéñ Z¹¥Ê«ú\ÉL)zfBÞ <_^>¬°p¥2= ûìÀàÁðuäe«¼\{&;Ç'v¢»óÄ_¾¸ ÐAÕ%H<J¡Nß?ßj= ¢©'aÉ°i> ;uËD¸XCï¦$;³wDÑRùJ®ýà/Pä%²ð~¾à§k)Ä³r$R:Y®¹xv6ªÖJ&CÖç}È´ÝÖ\×?¿Þt¿ð¨×´]kôCÍnaØý¹õúäøt8àv{ln3û«	ÓÇmË½×µ¡zü7eÏøVÙbø@FE§,î9 }~T)ÉªÂ¸C·-¸?zRf;êÈagÄîßÆm7JòË3aJÒúã¢9¹I¿fWÇç{%¨ÐÌI¡1Y¯Â
-½Ý:÷M²ipÌ²õùÇqgÜ5«w¯hI.[+¬Å£Ôáj¯Ï´^8Oµ­øþÒ¨qÜ?X÷o5é¢H¤èò¨@¹Ú2PY5¯DèFþRwy(Fg58ÿ'+ DÂhÏ|I¨EÛcD¤J'K
-	ËBðö:ò= ð,¼=M,yí¤l£bítÂ¶ìpE,óÑ¿3Ä$Hr§^+5ÖóP¬0_V®F¦ =}}ä3y¸ñé%HíÓHÊ;é Ä}<?zêÀòp1W§0ÆuáãE¬/E¦ÒZ8òÒêÏÚûïöí°¹!º6äBÔ:I*x5K,5(ØjzÚºP~q
-\\=MçEW^³æû;)!*ÊÁÍ¥8(78ævuüÿI×¡ÞEeo	OôCúÞ¹wp£t-¨YÉÑ}Â¾ÁJ ç¦B¸´¦þ-â5hô ëG
-RgêUjëG¼CÎ0íÇNUjPä-:5Úý,oáé-¼ðr]
-ñ|â39&9¨oe¼qôä nñ¯Ë$reú¼æ×Ó<Né^MÅ¨Ð~Nët¥/Sh6&«}7©ÃÔñl­ÙZÞè½Ð¹·ãU§'Ä¬¡Ã>²®Q4!iÀéc¬ø{ËtÔU3 7-_ì,?UÎì ;p¿;PÖ»õ'cîÑj1çjÓ
-«Ô%àõo	þvìÙ!íçsÌí" >ËfÎDL(D\ÏCcð"Wà±{d¾]³FsHÄ´wý6= "ÛèÌOÞ'Xñ,½Øä¿±QÆB×©;ËÏã®ÞYÍJóUýí	~t©V~ÒlÔ{Ù(¡Dk¨!§RrN®X3ªÏE/;¾3bH=}D¸ÿUÃ¹h¾»nO@äDø·ÎsËÒýV××/n-<¢ÝxTcÉiªm¬NnäÑìÄò¿{®OÁ2¦w0cmw§Jaq\c¾ðÖAQÿíÁs°N¦ôgv2QüûAÆìúÑîÕ8{æ%!¿1¦æ±&ßÒp±¶ÞD3ÇªtV5'Ñd/×ëÝH°5Þ.Ï	¡È®,­ÿ}þîphËãý7Ú7"ù=}ýûö\ ¡p;5ftñQ¦¯WyÖ&$Á>GÂU®µºÂåqöót¹7ÃïçZñ67o@Ä:@¼­N6­eñÀµ,ðË3= ë¾p¾+m,³Ão ý@JæAtª¼.í}ö­©×íLs= ¨*R1ú¬tar!ù %þb^ø\Q×ÖámfÏØ¡àdÚº¦Wð]íÓ	Øa¨§¬oãÏ³FÂZJõÖ2Akæè[&õmD ÞUÝ	änçòmÂ0
-áà®¥ÒDÕ=MÕí/³²ù+)ç+'&RIÙn0õ¨[<:OòëøÍ!¦ø±¨úÈßO¸~Ñu>ÿ5lçFùD"é¤s²Ô!ÒNU§mRu@â÷pÿÒ»qRNlÒ÷Qv0¡8ä¤ÿP.ÆÌk¾ògihUc=MÙ= úÓ9@ý6ôB²mUn(ÀÕ
-ý	)C!y'¿Wgõ#ïÜÑøÃ§«ã3ÔÛq¥m×3WÉ³÷.}Ax$«Ü9hÊ{çÕú²­t]¨oo¯
-­Ì¿Â§©ú,ê÷,M5)AÃN#Íp kÃm!?ê [%¿½¶¤¨{b>PªnH0%V®ÖäçÙv×þ0·}ôWOÅt»MÌ=MpeÕm¯WñÈtüb»½iØ3#sgHÙ,ºÏÇ!Êû[ñG¢s¹äfI±E]MeN¸¿FÈVy4®È[.:=MÈ­G¦Ãä
-9¯ñ:)ÿÓ95M¹AR{ëå´Y¸43ÓÞÉ©/Y¦Uµ!­)rÑH£;s1V8
-ÌO*Gã0d÷@è5¢öDt';>ÁÿÝltÊÛø Z1æ¡e,+©Á ×Þ ÝâjÒÚ9»DbÓåHS üì±H51q|¶íÂ*ÑÁ^ïªØÛb3-Ø°=}©}Ô{?jtÛÁ5ý¶?ÐôbXÐrhÞ8¯ðW"Úéî¦ÎNûò;ÊB¶Xê/<ÿçÀk¿ÖTgm÷ùÄEDö°gåXë&_/¡¥4Gö7ðÃMf9ã¥G9ËÏ=MÀaQh±Xì"Öô ï[ãGgnâ_dU}Æ°}[íáÀýí4Ú ùù@Ë¥= gæý(p1ÇGuÆ3ìâQFÙôLÉè»áUJÔM£'ÇÔKöÖÀQ£õ:gxq/c/-kMpí¯J%Ö!§ï<n§«¨Ø RGÿøjõqY!±¥¶°*ÔYP9h= ¯Þa]¡¹"º¥= Ðh·¯fGÙOéve^E¼ç¡ö ãH1¯Jä Ã¨ØÈ0¥Ä["³ïys/Ö¶¤nR<Ë"cg¹UÌ­a£¼¨ç­Æ³fuåÖ[÷JÆ¢9| â@­ÓD$Á= ÚÙ)üËæI	smOùÈkþRòI­aëÃlÑ1:Íi{¤w­²E¯Ôóm¦7kZÚÈY{øSeõ4'n:Ú¬(:ná:
-×*BåÓè<´wCP!ØpæÎ¿çÎË°%4E9{xÁU[ø©qéÒÿ­gÑwæ¾= 4\´ÉB-Ú©Ý0ÓÊ¼h§HeÌ:£Àø¨]-BÕÏï2w3xÓ®º°ùÊêDÊÒæyólÇpVÍ^µ¦ù±¿Ów!6Qòý*ï»Fkª¦;ÿÛÞ¬¹¦­ÜÖLÒ×óÓF<ÙäfÒãã3|À7ñêÒAu»ùª$Õ½ð3è¯ÁO¬(µ+6Ý^äÕeMÚ\åÄôä>¹0Õïté¾)xêl©Èû\&kfÍ5[~pv9¬ÊîRï:ÈtÅã¬äiÑ]è#Pï_ÿéA®Þ²#¦ân\¿³âC´w*W9ðpðO®W#¡F-C(61ÅõfÃ\¿Y´v¯»º¥Õdî	~¢;ÅvÊº²¿_1ðµmjW\6"h»%:ÈðäZÙ¶j6%XªíËr7{OÕhUsWvÉÃVã"Æsë³PÒB?Ï~²Ìß	x£z¿t¬Û¬´ ­"¯}4 åàwK·´Õñ°ÿJjý@_ÉÓS·~Y¶Ö&÷+AY8¦ª¹O4Ù¾ßRøÛüYl£Q¿þÝwþô9¨¿ÐZÙª¿2j6¿ìiîF6{íTjÎ&^-·ÃJqjqy~lÞS!ºdaâ¿bé[¼'®NªI²ÀÌ JùNÔ	?/7-¦tIç´=M¸^\ðÚcÏß%|Ú8µ¢¶,G58J58Mu=M-ýúÁO0zªÓ»®o%ÎÿaN=}Oï6.j*ÄÑ¤Ú9[q³èr.üS¦¹Äæ1ã1Q¨óú{Æ5^¬ ®$:}iQ	9ØTIáâ¤<<¸4@ífyë¼EæÓ!×ðk_8*6= T¨DÎ/®¯!ð½-ÑVª¨´[¯U&TyðÓÊÐ=} cÆÒ:ç*ü£À¯k»EÊ>õ Ñp¦éiÝ5ÓÒ¢¤@·ËôepÁ#qú®×nÍ÷â Sk@ÑÂ?3pIÑAk¯»×ý ½6÷þ öþ°@2Õþ0±Â&D)î7d±BM:ÚüE¼
-)f=}6i9§(Iñeë¨9)&=}6P7tëvÁûùÈzÂ±BOâ3®²ëh¼¸×zb±Bö
--")aë.7tðv= ëJ,"9üIC'gºYX'ÛGñ×
-[¼àFI^Ö\­òlñ äÇÚw§ªÈ¬õQWF¾ßÓfá%})¶»ä©q¢^âè¸FÂ~aR9;È<Å3,ÉRO[P{ñf{;ø<m<Oö=}¯@ëõf{;Vö=}gD¦»ÝDp{õ;Ðfù4A'M7ìU÷¶¨¹ì;YP[Pû8ö=}ï?«¥»;b²@#Eÿé;x<WP;Â±@C±Û¥F;ÜV°Ý¦ù=M°n°Ï
-s¹&®7ÊúfÁ:'ö2"Xö:ö1¢Xòz.)ó8*Éz7)ó88*ÉÚµ²9 1ä®«¬6ªSJ=M§D;Z3XV^hÄyçäÐ=MÍÑn çp­Þ§¦ Âô=MrË¹ Õùü/·õ×fMkåÒ¥Ü(Úµ"2þìÔèr³Ýª2ìV¡ôÿóQ
-è	 Ñ§~-]DþÆOjÚ¦xµ5è5ù°Aðóß%}+à©¾ðÑ¶þÏéXùâµª,øð¶o8D®4yÇØ5¶qB¶2Ùúf
-= ßå6BË%ZùzT@çº'ZDÉó±OýÂÁòÊhÖð&Y#ÌoÿO- "d¶ø!= X¦_QÄA³/×¨=M¢-,ÇÁî¯VñhK1DóW:²­¶5Ìóðu£Ln7ÔráÔr%Î .¹ÞÃä{C<ÖÈ]¤NýxC:Å¯n¹³/*¸"£sWh¾Ï+Æ(³âóÆYt<0j]9LMsScÒíßr¹aÍ3	= ,­ýø¡U ¥9^f,u53Jµ­ìíÉ³Að#ç¾õH­¨hüÁTJt¶Md°JÛÝîtÅ+~ÈsOggËóÊ$«c§-,uY¸ÙZýÚn\8¾¼âéA#¹'à×Áàò&v¹É> =}7#PbWU<wíî"ÜV]Åx%U£¯ð]ÖÃçvâõ÷/S±@ÝË>DiT:ÿiHiì+;HQ]
-ßãT´j\è´gl2X£ /+SÒy\+#ÈÆ²t>äÏ(ô%²ÞóuôëÏÈAC¡ON¾
-p¥qTXü&ÛCæáÆhLH\°<ìñU*ñhÜlÙWîtxçÜd¢4É¦ÑèÕ æëdw÷HÏ~~äÀ/µ$ûE2à¶KÌ©KcfB°î»Q'ëÏà~¯¥+Þh\3víÈOÿú¾ívUÈWí¹ÊIWsVþl .²0K²·&%÷?=MSÝì^júï)r)
-³#eó§þ'6- Î²ÿ²URp§/c°,}êùzI5Ê\¦r(/rí³ZPRÁñÁo;ë;T"¯æ*£þ8 u.1= J¢iY8KmÙ:E
-iÞæ½õíÿòèÊÁ|°±ð0¨]ï°s!Ê­Cp:Ýx5"(z¦æ/Ü<Õ,¨9cÝM9@4= ¬À=M=MæãHóO×ªÊ*õD¼Ï¾j< ·WÈ%Bd,´?x\W¨ÞË=M/üÔÜ÷Ía¼H*òûGm­4I8ÖR²¨÷*NxÇÝeU¸I]îÝ[Çð@fzc:Ïy÷ÓgÙaSçy ½DP0D'= 1dü¸ø~Î^.ä×z+GBû0<o= È¯(Ôí{ÇM¬Õ«-uËá3üæßb&hX ¤(ÛæÄCYÞq8K\sÌðdØëÚðsvÍ
-k©ÖlVlXÒÛ{5ÿ ÇVaNîç5³¾YRPôä= wµb^Ùp\= )mbV= h°¦á6uÕbæQ!e°Yª¢ñN¶ÄLü,wÆìh-æxAûQÚ3uÿ\\ävòe¶OÏl8%µaªËeÒjö½dòìwÎÊãtÒ§-´×¿ ïYY¦Ë[Q=Mòa:yG/bÞ
-õ¦Kz0læð¢^D= ^ÞoâÛ²@Ð÷fãÏ0)À.u­ùa¥/iÌ e¥ÐÈïU¯=MMd­ÍÅtaæsóãôVÒpÚê³SäÞ?q¦¶]­î¥úpUäÙë ¿È¤ýQäùÕ§	=}³+VÑ¾ÿü±¬Ï:"O%oo@ú2¬l»{p©®"¬ÚÅñ,¤«æÆZ\9©2³Ø£±ä0íg|CÍDP¬cËa8»@¤ÂnàU'­Ö[¦ÙÁ×Åd Û¥Æò&G:r ¢x:j$¶âD¨ØaïÂ³¸?Æ ÿ7¿j×-oúFÆ3>}U[é>#ï}cÐå'ÍØnÒe!,gª2z YÎ°V
-u|êÂÖãmÉçñu1àX- ªbO&dùoVxÍoÊÄy­ãhúkäçË!¯äÂÏ©dá_µÛh£ôY,É¥åK4zC\Q.aïE,#´é6§,(¡ú$-3÷ÀÚËz¿^j)hâù&ð4³RÄ¸³êPÝ¥ó1ýÄ1w:= ñè>éÄï$z$Öh[Ü½KV?F{ÕÀ¡Rö!;|ì·¨oF*À~<tK ëØ-vç×Åd,?ß?1Öó¢ÓÔ´¡9nöwö²%Äg¦Ø½Ld§ÆyÂæÀÝ}Ûåß«ÅR--­´è4i®Z.Ñ<BAóI³ñGrqðqhp¬pô¥'©·#óÜÿ«¾ü¢ëçeÌ%Î& ©ÆH eTåÎ/]ÄösÉK¡ò@§¼bzÄ²Ù6ÐD¢*8ÄKU1 2ùS¥½¶ñ±¯0°õ±a7÷)ùé(J'úîúºöåòðqñsò'¤rÀqØ:¡7h0æ5½jÚb·é76$1ZÚ¸¸#³ú82òúº²ø¬Þí,¨~þ½ÁÜHX0ò&®%Î%¢¶Jèrç&0ãY´*Ä|û= IÖý´·ÜÃÀ¿·IÒÂì½íHWNLñü¤pLbÙ­ç
-¶¶\xïÓÍ/Ø~§éº.§oØùÇÇí!Á,ÆÛ¡õÑÉ{â#
-¯[¦÷AþB´]h¨ô¬
-F= ÞïMÈ¡Ü{ñÎ=M
-Ê?Æyëí#Un¢§%©Bx?ôÝ¥5oØ¿èù²øYûÅ,º/÷4¾ÁLJppïÁ1;3k5dXY	ZÄ\zøÚüö |º/²ÕÈ[Kp*â
-É	¹ü³ w6]f0KÄkÿ}X/õÌéÂ^B]Pe{zËB¦xæÓ°ÂÀ5$Ue#ýÉÇF$%Yg©_µ¾EupïY6&Z]YX'¨%÷ô= ¯AbùÐz 5ybðp]z¸ÂÎàY±Ó!g76Ç¸Yw¥Ö¢j¡:1.Ëp8v&ò)½Êsû|gWì45s§ceEóÃ~E?C0±ò¸´µ,{'Ý¤¼)^ÁÓ O\ÿ?·YÒþ¡Ü%Jæ)÷ë^¥ý|¡mL	"íÌ2¬LÈö¯%!õ Æ¡Á3¶uvIìÓTV#_É,ðÆêÑWs	O´ÄÜYþè[¼ËÆÉGÌ)Ñá:5+øj&JÙø[ð1ÔðeÎÊßÄýßøâ*Ô5Àê­ç/|> seoupö/ü¶ìÄè3%X@ÐªàÙÎöFéznsÁaXgçµ¢©"Xø){ ø·ÿÿÀ¦±¹-|¥m=Mº©	7Vêhxbi¸åà{¢:f²!Tu@iÇ4¡)siw¹üèrÁEBÚ4,¶ÛÁ,{âÛótà²&HA3
-Ãòúëà$ûJPªkî/Ùúo #Ô%AÔ¤Ð¤)ùñï,CÙö%#ôBZÇjÒ´-ýÎJ-ü	îM­	8y'ï v·¦!KOôd"} .
-!þbg²ë±¨.{¦Ê®Wx.ãü·ÇPÊO¸7	y­¥¼7ZAt³Èy²*S¼FT© lãüÇ{F_³ó«gVlX*üiDÐûõû&cyÿ|PëUÃQQ½jÛ½2[àa}ûêàè¾Î¹_ É± YZG³X²Ð±ðdQÙaEÆìiåñ]ÿ¬eZ¾{pÃuÁÈýWÀ¬}^¨ sh¢¾9ªÌØcBU>°K±ÌwY ÿÃUëÂºË*Ö³BùN«²ûmE®\-Ã,sÂE¶û±B+XaÎ¬TÃ¨ý;r+û}Ñ=}9ï¸3Ì²§\@Ð6M[¿ÛåóHÚ¼¦">ø¿.ä}£ëW|¬:¯a¾ä\À»É[¦Üë]u C³SâØq·Àõ¼dYÈÀ{à»£ô£÷#ÆW©>ÏÐ´§\âÉk{]Ë=}Ñv]Á~HtÆVDÞT»ÓýU]³·V«R/ÙEÎê±å?oþü5Ñs±{}Dvg¢Mÿ;A¨ò+j«2kòtÝO ëDöÄ"f,b«Òùn·fbÙûýa'$4¸dRÖWM!'oýü	µüÀ»ÿtgòòp¸¤³°ø'ª6òéPlvgû¸ßÈ;ÔÚ_³#}!ñ¸B2Zy³m©òt¼å®Ë²íL,Ä= |{Æ¸Ïà= Oz óCºÍC*¤ùÐ¬J Pád¶ÌÌÙPPÜ-0x:å÷÷ë( ÐfÀ¨é÷	ÇwÙL²$#Üè$jE®QX¥6øç÷k2æ¢vêùe£ù0£|¡(&çºùcóÙP9õwàçÅë/04Qø´«%c:ÉÝÇçÇÞê¢¸øh]¡ºÞ6oêç¯2ré$ãCûT¯¤máùÐÁ&l¢¸}tÒÄ¤eÙzû}¥ÝÀÝ¤uÈúÖ¡ã¤é³¼äÓM+ÁÇò/t<"%H¨Å|ôòyûüpPÏ7,iÙoî¶ÇêåÃ8ÈsÃJýkò:7»ÀË@ýÌ [{#sA?}F{ÍD¿»;LSHY(rPÒñ2ÿ4ÖÊ&dÎ7ágì¬êå¥Öÿëµ?
-Äë0ä-BH¥{$sq¹'Á(úQ¶+áqh³B­Yæ¬ìÀóë@f±Oö¿TG­-Iï­~!½FrÙ÷] ÑA
-ÕËñ*´&aÄ}$Wm¶¤ý^Ò*qN>§bÍï {¤ È4Í¼1)N"ÿç9ø7	îA}eò°¼»pI8¹4
-äôøû5ù÷Æ²·níí²IÕNø±nø:ñß¢r¥'ÿlæJQ¸3hÏÓJ°IÓTÔÓ¬ß#¾òMä=Mü =MÇ= D$BÐ:4åÄnZXKqj¥þ8ôR*ø¤QJS)Tí«°ÉÞ@àPÊ&kÌ	n³-ÈvÊØø,ãéyýn5)¢éê8aÍe(waõa.¤}%f'bÉÖ´ß#8rÏÙý¡Ï:Ï¤6Ü:¡x~f¦ôì&îÉQ¸êÿÑÉágØñB)Î5m¢7/4ÎnI×÷/ëöÙÛÌb	Ä°7'ZzP^÷âãr(8(Ðöp*9Ç/ØTTú\®:®GyÄ4«ÊÄK=}4>fÊ,Raá§z¶6.³m:øûCtìÆß§}HÜ ëþlVqdt«yYey^	^ñË?}HQ³Hk&6ã ÒLä0@Ü[æº©9Ö3°$°¤=}ôûæÂ]ÔÈ¢aqÙaùa$ÈÍ§þªÐÖ8YãêOLu·iBéA÷Ú[!p4Õ^îÇ'»ïÃòdR{u´?îôª¿Hçÿ?5Î/íÀÿb#\ôLj Ô)ûJÌÉ[¯7,º$Íh<xA¥vAWeûõK= ÝM¤<lÇrK'DËT­¦óC!òÀáÑ;0ÔÇOìG"Ä®%e CjÌE&½Z»YìÔix-ÿfäÀSlÈlêÏÐ>³©Ï¼#p¯zùjD[»ÃÒk:ÿ%ozÔ{Ñ×AÀv^äÌý&§F	¼ËWsæÔ5= Z-æÜI!0ANH¾üûöÅ¥!¼s^x¦léPõfØpÊ<"<æDTçÔè  Ë°ÎÏßÀÏ÷>ð¬»ÆISopJá:
-NÜx16;hiêéßÓöO÷ÀUG(GñÞ_ kÜ,Ý·÷Q¢Ë|¨¨Aa½Ëc¤ß©:À7úå#KÈÑô¦ëc%¼#[= à+Xß½Á+EúD
-:%RÌ^ôÙoâÓâF£ºÞp£½±Y7-
-Xyk~h~a[Í||jd®%ï©ñ8.æ½ÃkóAÛfûBèÂo÷|k0²Ìê¼JÝÐyùDy3«÷9øí¢®ÉWÍóµ 'í Æ!Â3É¯¯ëîìÓ$W2·63/  4bJ¡éÆÈEJÙ*"¢¤§{k:»	)v­ù3)ônÐRªó#&$YSzhw&üX²WÚANrg?÷ÐÑF­­î]÷·ÊQÊîñ:¬ã7£½Ýã7ÃÃÃ¯Q=}Í#íÓ-çYzÙ·³¨ßM¤Ä Ûv3©ÖÓS$òrmd\\]!èúÑw×ð4¬|"ÿ¦vÿÇë¿7µ'%ª¦nÑ§ï= %Ý%¡ÐúêúÊÊ Õ¹¿êÍ}Ö§¤$Î9ï^bfa¡¿%05º _áêÍìßcm21Ø Bëº÷§ýÐm]Ê_3= ,RÿàÊê½CÐMìBÙwNÜÕ¡æÍMÐòÇL·vïÌ8I0¾°
-NRé¤6òÚ$4qÛðãjR¤Ð.î wuØümÇóþá¤uÖ¶¿¡#¿³ÉäÔWÿcBaHW6G	?ÇdBàx^ûhÆ¬à4s5ÿ¯¹ßlÞo%bPÛÜ[G.ËCS?#SM]<×¢¦ú^_c«LFë{G]F<^m¿{Ë<=M=M×zêúó²ßl6ú)¦­qNàeÎC.DQy~­°8'£ª68"øöò	±®YnË_«Ü;´Üå>#4ú.{ËªBM1}Ú®«/L8³®z;êUû,¼v­{QH+zsM¿¥ÅÍâÛ5VÎR³|ÿÄ»>&ÅÔÔ2p2r]³¾9Xêh9ðeûµë{À4;nN^~>3ÎÃOÛ5ê:aùëS@sûiZ´ë= ­*(ò§ü;Jb¦F^lÁùr7°"þv=Méí¡£ÛÒÆÞ(¼!mDdìÌè\ÇG_O¿\iû~ÃÈKtSà4dñqLì5wÂ8'Sè¯®¸?ØM¼ãÚcþ\_è/m&)ý#ìSÆ ªÚk%¢Ó¨j¢éÔ¯ÃVâÎÈ½CâÜ¨òãÏ^'Í8=M  ¯ÖÝ*>¸¸'6ÿW{mçCêµaÒ")xØzà.º]­lÚÆp:ëdI3¨¥ö¸ºë¾L64+HvöÈs×	4>óX[2*o²XþTw3NÖíáOAU¢¶ÕñE4\(-Ù4.ªTr§ÿvTÕ¤ 8ïØ%p/¯
-ZVmÝÜ)ßlðz§: 8W^s=}qMnÎ= [C¤¤øÎäù3ºÍ'G:âà!OrVFCO½ÈþèA9¶2ÂæávàOÉ0õùÏ¢b,T x{ÊýòÂôD|1¡MÛÆÜ¶ö¦:×!mÇ.ô§ë/¯osï©ÿl~Hÿê4
-NçB#Î}yg~+
-YDø*
-â
-Ók¿%©9õh Ãy.êçÃ¾ç/U¸q{¨ ¼?%·Ñ§h{ØHÀÜaw¯¶þ£¸I%©4&flJ°ºåeÙt¿Êohj2hHSå
-øzU)bÂöccI%&3-/=M ¨È«»èéöHY¼Myîîï¸å9ÊxìN(Y¢Öt)5SZYÒ)ÄØaM«ÓLàÛÉãdÁ>¬ÎÈú
-kÝÙjPäÙmi%©µ¯·,«xIÝjjáÀH^Óx&ølYmqãYQa²oM»---ùà9~/TwÕZÈ²<Øî×m(ÚÙkÂÖKhõ!PbÎ"µIÍ¥0°ºª·«©2-KbôÓJ¤/¤ÈÇ¶³W°zT~Õ
- Ètã¸r ø¨j®"Hãòø,µ»Ô;ïÉÑsVl[uúo¨óÏ3,á÷:[ö&±¹¸G6Ã¾\ÑZnd&ñ(Z*)<1l!OòÚ²·è!©Ã®T¯%Ì»iP°Ú	]îVy¾©A¾)¶ÕîÃH2&ä´SFYð
-røÈSSxèºØ§b!m%Êõ¤NAMW(»y9Ôîÿ Æâ2"ò¢R=Mâ@8#%eÊè+Å°#µÑ= "Él^sõ¦&ÖÅ×35ø¢o\¡.¿]ÔÔÐ(£*Û+ãÿh«öN¼¸^@Ùö3qÜªç1yün!xQTv4.ÝÑèØtj¯!7Cÿ}ÃLQÝ¸'yj¼¾|dÃ§!X@\;A5êúîü>e¿$wo.~î[ZöÒ$«o©JêöÂ "z:Â[ázÕä
-{»= §+;æZW}ÇÒÁZ{þ$&>§|@!/¼È( 0¥3UyêB&)$M-Ô¨T¿>Í·@Ü_sV/Fum¦g=M-A#kßÆ^{%ü1WOtC¯9µ@Wá]kHÜ
-[QQC¨@_)Û¶[ä~Á£i\yM{WÌ¿_ÁÇ;ÄÁ]BÉ½ÌE´òöKç+Ä¹ØGðoÒ$ãÚ¾>÷Ø'ÁÓØl\q­)/Ä9©ÞÁJSÄôC£~Åã4îá?B5óÊYyÿýÊ?ÖraèÅs¶Õ	u½î± ßéT.7ÔÎb4¶ô{!¼áÜÔ$¦Òjo¢µ#¿¬Yc çN2(ï¬%àLFýâA@{x¶t&¯	ÜØT¤&Næ!C{)1(ÖjØjisÔ®³O-é²^É¬lßÄÑH»ÈÌtG{Ä¯Oxö.f­§è¦¥.GòÇ "s:Dõ;:e@wktwïy²wWÞÙw- w9Á,wÖæKx@èex¿ýx!xLÄ½xÂÚÎxíàxùóxuúxêxOÅ2xI= By/MylZy£fyÅsykyÏZyúyÉ«yëÒºyÂyJÊyÓ Ñy´Ùy«)áyVêy6òyLöúybyòÝy³eyÏöyG%y(-yAÄ6yùK=}zZAz_ÚEzIzfQNGÔ>{×WûÖ¨±8í¨óÈô¡ñ¨1§¶ñÚ±Jma1-Ï<ÐJ\t=}½¨ëIÊ0ÔrSØI!×eî_"ØHý¼\ä	i«ÞíûÎJdyS5ÎVÃèC"Êkm=}^ícÕâô­nÙ±¢NôùoT³eYH-´Å×å5$WEÛ
-íÉý: qf®Ó®xÒRV-
-¢K@"PgEÝ2}ý{PÂÉæc#Þ!ìÁx¥é·n³ÓÛû«sk¶Ù±|n½Ù²?NCYøQ'9_c4is6«6ÊÛzüe9Êàþ$\QQpp4bÔUL=Mâ#f¸Æá=M2£cD¿ÐXÐï·LÚÔ®Á:ßùPÍ5fÓ,U2âo¤ÉÊ=}ò^ Ú Jà5Ö½Æ½dbß41FI¨L×d#p«ïëCâDíÞ@	y=}ÔÈìÉ¹ºüÅñ½Úºgå¹À¥7qåTxÈò®u¼öÕÔ5¥0nòùÕde©LòÀ¯PÔÔey3åsãê¢PáÐ·÷ä&±= ÉÐ÷-û|Ê¼8³ü	¨EoO7É ü¿qEe.¬Ú
--Å·ÞßïynÖÞ´jÊ&.C
-ÞlÊî.3ÐÆ¢i©®«àé¦i«¤Itt7[Â!®Ë¡'§¿jVågg¢lbpFfggz¡m®aaÔÔS#¡3d¾ÌnSg
-[¶A&=M$óuØÓ¯Õ2â(o7âßÜËúº­·2äjÎ³Û×ã¶$lÑùÔ/A¦ ³Bs}üüàß=Mæ¢e*	â^jÀ ¾S²^Ô>]TÊLÝ§MþÎöÌG]é>MÄtÚû´=}¦vb«&{wLL,soÇ¢Õs¯×ºX×-7Í®tÁjäl§T~6H§®Ã¡¦ O¨b¬èOÚ1ÍXÖCQb½x«F¢¬ SòOÀ\X°!I¯C¼Ú¾,gC¡®Ò=MAìkÃ¢>TZ ;)T<CÈ;õÏ6ðÖzN5rÊT6·lñ1 4ÝJ¢··7ÖµlWä.Ý)À3%?ÀbZ:´« ÝBÖ³«øØÚhÔ)©oÖÖéóãÐFaà	w¦%Êç*¿v-1Â>mXS3	ÙrD1G¶©8[vo©íûÑÈ§qï¡¦ÑJëá·éP*¬±×= zT¢ü¶$?xIÕ®¬ßtQÕìãàTÂPá¿ÔËP}./=Ml¡M^IïkýyK
-"A²l ©¸Í6%ÎçÚJõoD=M lXÑI|®ÅqïóVß Â^ÕGS·Ê¡÷6£ïòÊ]ìcÁÊ_4	CGGu²s,Â¬ºS6²Jö¯mÁ«%©ÊU[H_=M¥[&QH{0øz÷5® zV2^s÷j2/ywÊ*È!Ìï(Æ,dxÔ¯÷Bö1ûuðvUöôV5±ãF±\yõnf±°]öbÙ@¯ õIÃÚ(Ù¬.ÑUþñe§þ¼èäSÕú-ozÍX-ê@Ñrb5¨nEÇÕsädVjra3p¡üÁ7Ëq¡HlÖ»qÒ%ìy½&Lô¾d9N?J;}{<; í¨ñ:ñ¨ñ¢ñ¨ñ¨¦¦:§V>E+µÇ¦^úrtëYb4µçü{òEðôÐÏÏ^ô÷GDMEPÞÃ=}Á¶"ÌùtÒy©	ÈA<V=M´ÑÚðd/«]ª¤]FÚXÞ±Gª®iÍË<LºF^åp¿ò½gE!À;¡ 5ÜùÒéÏg-ý¾^6)7¢eªuì_¼Ø1g¯ïà§áHF çã%¥%Â!¯n iNQT\lËº/dêà7½Iª½ïËåAP°°XPoÞÐËÞC´Q0Ï^.ÉGîÞß#öÍ*:¦:üº-6À'Ú5.Ø> Ô­F-ÑÚëS-Ìï÷²S%ú65FQ	·)~õ$, çÖ«¾cËø3¼®Ç$¶ÕKÚøxý(PBtñR²Ø=MËhB§['èþÍpÓ èç=M9)ÿá.´¦pÖ¡[t·e27aÍ7§Wn®r©sEÂ«µ{×í5jÆ^¯áónPÆÊ°ôõá'ÒM4ýÿÅé=Mý^è0Oe:Ø¿²ÑðóîcºNNÀ5W,)ðÏãF9hu;º;»:FWÀxÂ·x±ªxOxìxôxK&tx Ágx{]ZxgøLxí?xð(wRw±ówF¸Øwmê½w5üw9_UweJvÔâvvi¸ô=M¬öæöáÇb÷¼d÷Ä÷Ûkß÷'8ù÷î÷Ñ/÷lìBøÎQP?ü>SAO{ü¨ñ¨ñ¨È¨5jñ¨q*\-ºTë§ùSUêL±ô}ÿPd$45AøË-Ö* @tÕÛa(
-¯ ÿN	íÍºzsWJ$c+LîjüMozñP= Õj$kr1"ÐÐ²ÍyðuÆ²ï82NfÊ:O"z«6 Z=M²:ÊÅJµNðázfAìÜ³cn-ÆlS Éb±ÙÙÚÁÞ&É:sÒêÖQk¸l¶-ÒpPr­¦>6º½8(ÀGtÎsª¹×¼ÐâSr WEií$E¢UêNv.q*ª~$\*w¡´*âóuz^¥6Fù_6¦ú vG·²Ú7çêwÉû$÷MÊº\Ðÿ%WÇ1ThÁ¹âþ<=M"¹»<Â1TL¨ûF1p¢Îð@çãÊò!dg':	¼F8Ø3ÔFÄG²ÞÚB@ÀÙG7ÖÜEy£J-îÀzn>Ä0D5K­M}4:sÉL3ÅoZ-/³Ñù7z¯e_fÐU¤/ZÓüEÂèÚþzþ-{zÚë\À=MhÖ¼= Gcêt²Oek:öÅäªå4*Âê^íùÙi½<{é?<Ûwñ¨ñ¨ñzñ¨
-1Æ¬ùðv¶v97«2j¬À.:dÍMzc×8ãCqU¾7ºóv¢g+©W.&?-§bÍ2þ¹oÄ= gfì0ÃmVÓªá:å-¡ÕU½4:°1ªûyÎ¬wwáÀª¾qÁuçõÝþ|%W0s3ÈYá&Þ¢»h>éhotÃYUÌ÷ýÓSN¹¹¥ý¿á×Æp~&ÔTjÕR¨|.^Fyiìÿ\ÅÚªrÕòq¸¦~éÿÑê¨'ó® IÜÙIÏZ®~Ü^ºvýubqsÞ±þÔ½F¦áØ®âHâ©	þkJÑ9ü |/÷s¹Æùoª2Óþz·®ýÒÔ¹·,ûJ9woE[%;ÁÄ¼¯9W}ªK&Ð½$Z *KE¹cZÂ-M@«ªI"÷²?ª
-«[vÍÚ©mènÅX*ÞÃÙVÙGrò «fÑ¥´g´Ä¬c9R=M³9óN
-À1?a9Ùûã_ÌÂÎÓnrÄHsçgÀÀÖ#í 7	¡õßlõjÈuÊ¯BT"Ðü¾Tµ¡M­[NÔQ¹¶íc«!9§)!ËøqB¢¾uQ äÍwiùªyÁÊ.ô»)²@Wj4}×=}ÆSîòÃÆÙie!MÁ6côý7­iÐ=M#(h e	ä fã[-·@)ÐOèç*Ð·¥éÝ4:3ÀöôÕrÎ¥ó~#Òp÷Gç´hÎz=MÆ°óvkîY8µ½MVû ,Èçè¤ÅeÕS¥(Òÿ¶oÎqæÔ¾rÖ$E¤ÍQaw¥Âãñí7f#qÒò-ëÈçë±qj£b(vXWÓ|þ:uSë%bØÐö+g#êÓx(rÎö·øVhY)Ò/ÛòàÂJµ#,# ®ªjÉâµT6éRy)4ÀyiÈ*b= ùZ$8'"ì>'ÉU;¢Aë4¸»?*|ù£X11|±9mÃÜKzG,5K-\¯HsÇã¯SÀþóØZ5¡SVÂLGFcÚtý&N^7³²?xL¦Þ/°Ãë¿ LrÃ3×S±lñ ÃçªÆlÑ)\ É¿êA_^á}üjM5yód ¨ßÏ¨PÅà§^ $d¸dà1ôÏcPTh±m©À[§ÂGîTméêÎ¬$ÃGÈæmñ9_FTbD3UC÷²OFQSQ«eQëªM#WKÓs]<Î0=}f±DXP#ZP3)íûÇ:C4j=}P²@]YFïùKó.
-Ú=}-
-GÇ>¯<OÎñ¨öüöì¨Uúñ¨ñ¨ñ¨WÈ":ª *Üz:4 *ÊúE¸:cg:é4|ÜnÀ!rPýe'áKôÜÀ´EL<E¶öe¿£4æø¡ÝaÕtÑaøöT6úa·ÊÔÓmÈ;NbæÔ°	Ì÷ØÇ÷8©/e>
-ÞGsÑn«¶ÎÙhµ	%$ïTXV)¤ôàÄàU/7:.cÌveù_æøcýdæÃÒÀh8=}I¿P2¯y âÕw±ÛYø¿INrhÖtxÙaÔW ¹gØù°=MÔÔ×)õ±·ücd§&Ú)¼_Q_LÎ³=}æT®jÉ+¥¬çìÊ ·G â¡ºO.Ù­ñ§_+h×pÂ-³­C"?ÎóvÃ4â>T°n»8ø.~2ÒYú·4Ööº÷ó/Îwc2üØ»"©_¬ 0÷Fz2vn£ØNÊ¢t=Mã>ô1/CñÞµóS1þÁçïÅÞ6íqäJçµnìj(¼¬²ùVõlûðf°æ±ûðc®uMÍ<òQ(Ä³Ñ¬F+máp4°-}FIª®¤Á%¸Ng§À»wí£Ã(%5JèÆõÖð,ùAúb¢~Ê¥×õ@ú7sçÿÝàPkÐ"/íiþ®=M'ÙÍõè·lÑo3­±7ÍZ¢ùÄ¶Ê:&Øf0fùÏ¶Ú&%Ê8¼Gè­Ïú=  êö*Ò æF­51¶%Ï?§zi¶RYÌz^JØ½¸fò/\2¥ªÐÚr7.&-íEtVù²_Vg!Æ)7§TwªÁÙe6Í´ øÞàÿLÍTq}UGÍ²5QG ªÌ'ï	ÌÖ ö÷¿jÃËúp½ÿºëò_¹¯LÒvä³÷ê×#=M$[@z»ã­XêaÅ1Z¾;æt©±Ù).Ø¨§q¹óhñ¨ò(ybJö'hJ:ø¸³y1¬b9ÉeVM]°4eSøOÍ*Cxæ@ÅýäÓ¸ýoÐÈýÍ(Æ@H"¤}
-õÜh{g¿¨À~¿ÑxX¿u$õ+ãpq¬§i)çïQ½fï×Ve¶yã-Øîî6¤¸ÏÑo,ÈÈbýßJ @=MûHn= 6 3Q¤Ä¾²%ÖbèÐ)"öúÑ=MUàß¾¨Íö}ØâÉ#ýÖ	2ÚNB­L·¡xY[Ó-)2,·ÁåxZëÐÒU3+ â½³ë_z«xÙ
-I2Ù.l÷ô×BYc" Zâ¬Føwj©iî»vêåj"è,jT¦´ü5HóíÔ9.ð²,&¶ô<9£ýÊ,|j-ÅñE)l¿.¥Æî:=}Êæ!¬u©ù3eê·¾òv¯Örnjy:I÷7!zê³6º·2(÷$vi9z×:ýr+¸z3Õ°ú4t7´|f
-o¨BÐ(=M@ª7HÌU+çÿlXÌìáNï*½Çé#Haxëªg5F²6Û£9J¢½B[¹:{3°SÇt|~Ûð®ci:UÁfÉ^Ûð³_Ê|BèÎ¯ËYú&s~o V¢N£#ÔÜyWrÑÈS¦UÆÁ,i¯=}¹ÖÃIBhÛ¬Meè£S©¾&1=}ÿn3a÷¦Æ±ó¯ Y(:"»¹zXÜÝ)ÇFøKwýPbÇ+­çv)µùDh-½^.Á(¾ª¸L©%Â¨ºó2J{Ø[¹:Dÿð|+õLÇ×\Óó\O&þëdyWi=}À~]2vMé£/iÅü"/Åþþ¢¬K²²¡=}=}b}ÓCþ«¦O7´Õ½\®þö*¤sú¤Mu¶ßuÙè{Ýa·Z ¬Q=}µ¡^´qYI±ü3·ÀÐgJôe4£ØÐÊ¢ØE<£P]¸\QñOÝLßóOÇ9"Å¬ÿó?ÒÐÛ-ªD/^,ëíO6ÒÜ~¹T&qA(T}
-ÉÝtl àWjeWâ»µ@·)dëÛîMåñWA= ±e,î|Äý¹]Gç¯JRgÝìÃzö'Ìg÷i6nLÚzÃ9\Ý.z7ÚÃJ¨]ø9^=MÉr]ÔÅ__=M-GÌmé=M4%Ý_uæ[º²@ôúò¥fÞ¹ õåÏÁd\hðM% 		ïjóË÷^F]_ÚÅ-ãÒiHÜHJí£6ÁíH
-[ â¯zÍ>·¤ ¥]1i¼!ÂìÏäR~õc=MúW|öÁ»¦c¨hDáôV>¤ór¸¤&NªÍÙ´=M6)æÐBØ¯¼^= ðñ/$Ò+ÒçyÍ12ÙÊÞT|¾T0dqÜßQ~UáÖú$àÓ¯áµs(ZöâGÝv²6Î6ùÓÆÑ)'¯\ê¤æè¥/±¡Bm¬©Lôº Ô1	
-$¡®/= ..3º°ÒénYÙ&Ú¢tÈ'NçtKfZõÂhä-îGÈÐ'õç£Iv¸§eæ	i^=MnÊ¡KûÂvîúgÓ)´^ñ¨¡=M¾Àïäëç¿
-ýt$Ñ+ã&dµÜ´0OÜ¥ÚÊËo³ÛëõèÈ¦Öî= 2eW®æ})´Ñ&õ¸¢%ßiÈ¸c´²5\6¤«îø4*6^31)¡·ÂØH×ø!?.æÖMó*9W)¯üö?"V¥!-iQ³
-æ³íÉ#(7üÌøwè(kr­w Z!+3@93Xé­ÎvHô
-FÙ-Áì0÷7xzn-fÚ,b6ñÄÉ§BFPwYÝÉðzpLDúÒ¯£J31&Èæ64;kYÇ¼rÂ]n¦?1å¥OGm{0^g(¨Å$!8uAb¸^£
-rýAnSaýQ®ú^ÛÚNEbóÌâV=MþxxFþ¸û÷7ë¡};É1H}"çC ­ s©]9¸OgQ û_Id¢ì	hL¥Í+|8é'Õ?ø¯?)ûëjÔcãºI1Q] Yÿ4³öñ;ÒQ}tôCfÆ¬í?¡%àÅ¹mgnËÜØG l­¸j:o@@§ØÐS÷ÄfúÏ+]ÐÄsìÿ%Ö]WyÄsgÖ%òßf]&L@tTiÏ²æmõ}xõPêÄÀ¯²·y¤¥ þg5¦Ù|Æ¡ßÌEsÔ{ÑÍò¦OtF^PQÎ8d¤ørê«âf$	o¤ãx8x[Ë(%ÍtÉçnÞÔ6G$AXÝ½Ï¤mÃi2Üiyd0¯*ßá.9*oíÁr·2Ã(s´ÈÅz÷zY¢Á¼öÔ°ç0}Ñ4µEöÖ	r5l®Ä'1Æüç\ã>ÆøièLïÖÀ|e¨ùRBaEHÐ¢MßÏãØª$Äß=Mç. ·¼ªnD õ´÷"T·ñy)5¹ùÊÊ(·ÕJÏLr4jô*2÷5=Mù#¯v#Ñå~¶¢z>õ8ySæ	É{Úõ«:£¿!ÃrYØçµÐÜ ×>åÛ&¼¤æ¸kgz;Ö0}Ë«]WÒÁþwqIM,[x@UbG'1ÿôÃê(}/QÇÁÛâm¿p/|¼éBÐc«Q(ë3º(z2é¹:ºoû;@ÕS?¿GSk«70>³r<ÞaåUGÒ;BAi¤°óGåÅ¥Û7BëUi~vJ;ãG}@OUm½ÛXKÁnnál!kýKe[kWG¼ëÃì½ìÉìÔLs4F³SÆAvÌ{¾ÿ=M	 ~û=Müj[cowmuai\dpxnvbêÛãï÷íõáé|~zswuil= hnvúóçíáéìôøöªÏ¤n¢
-÷§ Õ°VrfSu5a¢Rð¯/×u®9=MVñ'¶3r)w·58ÝÅ9Ä@ðØ!iò¨*Î"ªy¹84òÛí¸°2ÇàV²Zx²(îòú_ øÞnVõaóÑØ6ó¹*$&J:Fãs!pÓú±"Ì.rZø5/Æfø5Õ8RZ¹7
-ä(Úð³4³Îæbg±'ÎÊºt°=}F6Wó15zö8½8²ùîTòèu8Åz÷µ1ÉfªMv3û¥Ôp8û®&7´âyîÕâ8»á«ôZgÉ&Zësª¶@JÛ<K'ô®áP¨ñåküJ{«974ñ>Óëâ@\S@;ýnñð±æ§ñ(ñ¨ñ¨+ò¨ !5¶½ÔTT7}÷ÂØu°û¼jÿ¦°%æâ(ØLT7}÷âÃÛRðõµ$=MàÞ²ÆGy0âÚy³«ÏÃÛRðõ¯974^±ÈGaúºM:fÍ cîK úD²àç?´=Ms¯]üoÓÄ·= rÄÈÿìÎR}j©ÍÔ!¢aØb' kÃÂO²Ü 
-o-ÛÈsUB4SïgtW¦I-ºô­ç= Á(w¦=}õ¬Ðpr4×¥©ðUrêÕ½¹àë®hùâÙ¶è
-ö¡Sd(îÏ¤!Ö¬ÏGI.ä=MÕ°ÏT ºÃ«ÐLç}¶ó¯!M\m¿·} rÔÿðîÒª©ûQQ¡R((hmÓÏ«Ì= ÿjo1ËÈtB6Óï"W<Én»¬·{´Ù°ÿïø"²éÌ¤!U¨¢VD()p=MÚ¶O¬ÙÓJ²Ú06¶
-ÇG"T ¡TÑ,Bx¡®ÉÌynU¨sqÖÈ7ÒV¥ÝÞFÒ$®mÔä¡æëÔ³±,í#þ¨Eu½!%óu'aÔ¸÷¨uÁ+ÓÍiñ_Æ4ÐaYñDÂ"KZVÆI×b,AmÙJäµfëÙ±+÷Ä#ü°-u÷"¥óU§bÌx÷©eA«ÚÝ	òc.4ÌA)ò<6 ;*ÖÄLwb Áí×z¤¬«×É+ô¤Tív'ÇºÏ°È ~¯µ3¯ Eô×iá+TñKélt¸ô~\"Ãt·2Òx_òê²
-Ù= ÑDú^q C$X%NÌF?tü[a+LPqKÉklxô|y¢ÓÊT·²ÎX_ñâr{Y@Q<z>q;äX#>nnÍºL!Eþüï/¿ht|¡5j\eGÃ¥6&zfêº¾ÞyTTQê28ÞºH¼°@{ë±VñÄ¨ñ4ñ¨6(ñ¨¡)®TòÙÑ$Tü¡ôO)ýÁµdOyGNùvùÜ[:=}Âýxý*ÔM¯ó]'°ÎÛ¹v\,çSf±âÎä'´fëàLyÒ((3sØìXBIB¾q×¹Í{ørñ+Ú-·½¹oâ@® /]ãTªÁGà!7a³:S	ÈÈ£gÖñÝAÕ|ðh0£®Ô%ë5OÆø
-ïH·ØrÌe¯Q(Ûá^Ð3ºSÏpß=}ªJ=Mâ­s|²¬W"½¤#ÍlyÑÝÁÀ:»uæPÛñ1TÈVÚÂÙÀª/IÝyÎ/§ï7|ò±#mmÛ,ãFjG~.¼)wºEù) ÍÒ(©aÁ;¹6x)zÉf¬½PÃÁ¥æmºÉÿ¤Fp±FÄæUwícÆïô
-[S¥#,4F<C§û4ü
-Óâï3DQ÷øOüN¹´f'Á	éñwl@ÀÆ(:l¯Z?;ÿkG>Ô h2¶ïY]gªp¢Ù"9ÓÇØtÔvUU£Ê÷nÎ\aíØyX=M uà¯$×)þ[gÁGÞëU¡rGþ-kHþsçJ.ëºÁ$»;;KC}l:å ¾ïÓa¤nÈ=M¥Õào¤Õñsèâ´Ê¼SNìl ÿ	SÅàlPg'ÈüWÎìt°)SÉ lXw·'
->´ÙV.t
-Ø.u è.v
- ø.w!"÷5wâÓyCg;S»;iKKÞ£ý6©ZÇaj¸²4¹±8
-é"0µ±øÚ&ì¦¸±(é8°Y±ØÊ" 4°Z±Ê2 8pJ±Â.7p±Ò.¡7ÐBö-'Ê´íf± é7B±0¾¸ºb±0Æ¸:±0Î¸ º¢±0Ö¸¢: ¼y À¹ Äù È9 Ìy Ð91Ó"÷¦ø¶èh¦Y1íâøØü××Øüûgÿ§ç'g§ç' [FÔíÍÔ'cÔíÑô'°{R¯}r¯¯²¯Ò¯ò¯¯2¯R°r°°²°Ò°ò°°2T¼DqSÀT±SÄdñSÈt1SÌqT Ð±ngüP»kGþ U´1-ÊwÛ§$.7÷ºùz:Ú.	4"ù®:Ô"Ò´nº1¹r6bÊÎ÷Í-ùv4âÊ/Îù=M5ú$v8ÂÂ+Lý³Eh7HÊþ"+u7I
-þ2+y7ÊJ3m9Ç3q9ÈÊ"3u9É
-23y9:gD<»{;»kÖLýÇ±ìøf<J=MÂ/]8=MÒ/a8Ê=Mâ/e8
-=Mò/i8J/m8/q8Ê"/u8
-2/y8
-J-Â7]:-Ò7a:Ê-â7e:
--ò7i:J.7m:.7ñ"ºú¨£z	Ú.&7vz
-.67zYÃJÀ3\ÙÃjÈ3^YÄÐ3= ÙÄªØ3bYÅÊà3dÙÅêè3fYÆ
-ð3hÙÆ*ø3jYÇJ 3lÙÇj3nYÈ3pÙÈª3rYÉÊ 3tÙÉê(3vYÊ
-03xÙÊ*83ºíB@;»{K¿Å´î84¼QB!B.À4þ·¹lÓº-Î·= º¢-Ö·b:Â-Þ·dºâ-æ·f:-î·hº"-ö·j:B.þ·lºb.·.7.·/7/·070·1714)6?ü>}[;;;ëØ¨ñ¨ñ¨ñ¨ñ¨VxÜÈí5&éï%U¦êò-¥¦éî9ãÝ¼qµcÞÁau#Þ½u#Ý{p ¸PeàÕ$à×Õ$ßÚ%¤àÖ] z&Îx'.y(®	zÄmaÊ=M_Â·bÆM_Ô¥Á!Ô§ÕÔ!ÓªÅ$¡Ô¦ýßcö÷Ífî×-døç­Ï3&ªø6=Mæª÷8êø4	6jìA'ìUÖ'ë
-E&§ì½= «xÒ®X2¬h²ó¥V¨ò­¦¨ñ¹fèò©ÆÑ{@>§+{AH«ûB@¯ëû@<ÍãÃhÙÝÄdÉ3ÝÃiÑó]EpÇëþFtïkþDzÏþErÞÉl1³^Êq!sÊm5ÉSì¬'>Ç_;»úõñ¨êÞ¥§ñôW¢ñ¨@"Ó¢ÿ$èP.ÏñZ¼4ôôDk r­Wkt7"9ö= ¦î»÷n ºP>.mJ±Î}HQ?Û\ÂQWÃ{DxÓ¾½GUë\¿_E#ûÀSIü;MÙ'\ÐgD_Ù¬_M>à/Åjm¤ÿÑÍdßNt= ¾+j¤KDÁNSdÞJn7ÌN±¿ÜàÃiÃKG\Ö¸ßÊpü_Ív	îÚ­5lZposuÅ$ØWáÕ»ôtÆ_TÅB-ÆF¸¸êsv5½n¢"lëg|Cölü<Z]¼F<ÿÛ|ýQ}¾dÉ3MÄMD_Ñ³S¶lþDzÝÀV|ÿÌ»W¶÷D¢Z!so¥ç¬bÓ_Í¯!Ua<§ËÚþè6= &ÓÙ}K¶C;Ûà  Nh¹K8.;	üBSyLÆa8ô!JDï4±ñfR(Hº<a{.V«+n³ ®ÀzþýýøýèýðýÕë_j'CVýhw¢Âêyvø"ÁJúÉUÉVÊTÉ$Ê¤@8ìÅçÅ'Åçí'¼9ÃùÃdêdê°§YñµÿìFåÏ­nèÙ= 2XåfjdfpÑ*ª'vMlQVØðrzæ[ò_øcè3«¥  ¢åõÁ.èq²x¥9½ÆQÊõzå%pT&IâÐYih
-ehäk%ÖMÖÎÍAPlFü9ðÔì Ðè(Ìì>øxN®	i«ÞøñÊx¢,í~ÑrôyÕ°ócøë[úÍ×ÌÒ=MÕé%/ä¶o2'?i4@¢ÈSvÝö^A>}Á>ÊA	?hõ©õ(­Þ"ð²õy+ï(vñÆ1©Ê%5=M-E-f-Õðpdp6Vµ~Å Ëxö¢y7Á»°ûC£=M|ÁKaÛáÂ×ÉÙRï·×ÜÐSÉz]usöõ¶³´6354B??A@@Æ7uÜ"Î¤!­ãã=}Ò³öYÕ[ßPÑ[àXÙRgu{jC^ýÏ;[ó8d5ÐD3:9ä	÷ÐüWë?ç· iÉ»nEó>Ù»rF3>¼{k+R¾/OkDM¾<«¨*ªñ¨wñ¨ñ¨ñ¨6ñY¥wÒ_Íe$Íi4Od h0o=Mf(¯=Mj8GmcmgVîdÖî= îhî^vîföîb¶îj6®[B®cÂ®_®g®]b®eâ®a¢®i"®\R®dÒ®= ®h®^r®fò®b²®j2.[J.cÊ._.g
-.]j.eê.aª.i*.\Z.dÚ.= .h.^z.fú.bº.j:n²é4îË g tfNkÜ¿NoìÿÎmäßÎqôlàÏpðnèïrø/nkÞÇno1õÒAÌNôPt$ø§à·'wvþð7&·n µRÓV¼F(Dmõ£§¡ilnuÒÕDiÎdâi.E® ém1hÎp!ÿÀ¦((uÔèrb)Gë²¼µEÍë~Èp±ªÓØEò²L±m=MÙ£÷É0×*8aüªN8bºÎØ\Ëýo¢ávvþXÔ)­¢Éö®ËâÑ·pPåèÈ ¥h®Ô0[æ/èòx$ð|
-ÈµªÑ|Æg=MiÖT°å¡¸í&ÒÛgÂu]lTÊµ!íÚp¾ÈNn§ñkÞè¥¦n'ñr~~W²p³îÙ)¦¢2"{êJ1ÜùvªÉ/Þ8":xTbu&¢Ù%'n¬Ñö	¬"´)ù{HRæ péñf³Èê.H¥úJò% Ixàò¶/³úZ.^µºA¤ÔwbÖR/íçÐVí¶Á*->Ô¹g 7ÀçrkIì_O9åBxÙsä¢nñ6íñ¨E¶¦¨ñ(ñ¦¨Èút7¶º½ªº¼æºBB»<?sQãK×SATÀûAÐ;Î½Q¥0
-=}tZ÷= [Õû¯û;³ÞêBb©<­¢«2>:ck~)Cé<¬j
-»·J×Z{ÒûDÑFW= Cw[
-M?òÐ0Ò@!|i¤q#g'ÞgÐQ.QFnvÿõ\÷,K9è\7g¿çIéXÞ­:ÀDõ]Ã^]JË C	O¸O.Ïì4q	|qòtìaÁbîÓÞÊ1= Òbëþ9÷JÍÃpÓBÇèØÚÌÿFmg)@í¼ôõ½½ÂeL¦ºÀwßUb¾ùìAîhz×Â%è"ÿª%Ì"pKç\= Ä´Aô~¢±	}:zF6"¨xRsJ^!n1,·÷ÂQÒÄ³/]ÙÆ¬r½zõOîÇ­½Ðf,fìVÌøsæpÞr¦ü'Ó©þôÝX °Ï6²]n?>xã>µl0Ì6÷Z²)[µ\'ÁÌtBªXÀóµ?S §,÷p+Òèº¨·ÞþjéÊÔË£½nq|G6ùÌV§Ä.#îòü/ªº¶×²¨ìnb'Å7r½æ1{XóR¡Z­n2þ*ÊM«î@,C3lTÃü.ûªAÜ4KzW/ÛÚÁ3ºë÷[a@9&½Öhãô\7v~ÿrH®®]½5[½¹w-§* K$?æ%uFóì_G2ÎÁÛÔE×VkÓÔ(psÔHIby6aÀÔHEnnnnî
-ÕÕW¸0922hPåcA3åWãÜ·G»ñm=}ñ¾D=}n	;¡HsQkBs>5#AÕÉ»Ò³;®þBÓÇi»äKÛý¹BïÝb«ûIÇ¨ÔG/ýgIQ;ÉY;'*ÛRÇ>á³efæ<â<o¸T[:H»®²> ¬CÓ¿®{vAñ7@L»ÎLX§ÄëLÀú@[©Z¿!ß\®;ýt¥UKïUTÂãÒK6M¬²?¶Éû6>CõuÉýBMóè½è]#¿^?^¹}6lÄ¦uÍV|ÝL¾wúÌßÙrÌ>ÍñE¤R<IL«Öæ?/ãa<Ù4ûUãÀîC\-gR2òDì%ÀË)g)âÆ+÷Ô]%,´Lu_!ÿ'3l	ócáó©M×	#ZUuº±ÑÝ.àãdÙøÙg*£Ó×ö{É]@²w|²séûb¸Ð§&=}= bãe%+PI
-l5p UâGäÄL#+d^©®çlV°SêlÜ2ømÊp = A¡ç¯ÔTR§	SmâeÁàä= ïþM¡§tªî¡m.¨#ÖÑ¥±¤pypÑÆ* 21³D¶±ø>¢Ô(Ãu³uD¢W¯ ÔÄ'ºêÐ;eV;~Z»;= »1A{{s½×ÂC%rNÌÛQý%]ó|KªÑüÌÚ+¤n½BâüÞHT	+hæNç¨1¾Ë7sËVüê¦d¿õÉ>õÜI5Ù>WI¾ÌÂ+ÿGÞ®äY£=MÆO$uH"pÜtc·Ázìø2£áH´ØÑ/ó¡Ò/Ow¶öÛFQ1'µÃ6áÅÁ·RôOë<²­_¾µ°ý|ß/ öb=MR©¡µg*5ÑI6#ÜU²¸Û<n2ÛGºªáEW]ãt¿Àl¸-{+&å¡°ð3éð³¢ú¹Ù'7äö¨"÷øýìØèAµg#w¶L°ê7=}=MB¤C&hé#ñ4á´8 &2Éósnæï	î%í¢-ê·m|h*¤WåØ;AÀ>
-@3Å[ûNhDîQFü*Ý?uJûØ6ë
-A§²Âp[ôsFû .oCtï@ÝÚý#£=MÖ#wìîxýß½GÒÿDó|Ü}5jìÝNÈ°5EÇ>ïvßøNÀªfÈÆHøý	§åpª­( øç°ÓX*)· ©T0¢ÇÂ¹ÆÑB¿¤iÅ5mtímhâ¡'»BNiÇ©¦=}{fLÐË+¡ùC}ØûÀÓ}qb³.x;Ý<¸Ø<å¢ÆrEØø>¬Cä­ ·|ãKLQfäÕ65avTõÝýÃ®tÐ"¦6Ál¬¨6ñý>HG8¶$  =MøÄd»¥BGÁØÇ¼¹$=}¯ã)uYGz;C}pd¿\|6(L=Mf_ï#ß«WÞ¥§fp@0N6
-'¤sªQø÷Õ¬Åq¾>.øü·¢D5³TáhÅ8zDvO= ¯óÝyàÙåFÆÒçcËóz?Ê5cèúë.ÌðÐÞ~OË|¿ÓQ§v)BHX6øöÇ¥kÒÚa¡cÙ7¦x©nº¡6¾}®­iÏ< ÎWh2 9's"IÉ<»ïX\#F\Ë_4F[ eÚ¸ø¹2øH$ß9_xì9i2µã
-ã/¸Äyf"5TàyÊ0îEê²Þm6ëÞè6ð Ïâ§9¬k=}¼àt<¦Mdç6" p_î3,oO3p"pw÷´/(1ñøs.íA/ &ÏUÃ_XÍpÕ1hÌ80EQö
-ow÷!x.AÜ"¢j+ï¦¹¦¶®äRow÷!xêpnâ#ðù
-z AÍp\0NHJê´ªØ^U
-Iwu¸öôú!3å6³âVq£³¹´RN£%y10º:p#\:J:b9Hµ7h_:¢I9 _¼µV,þ<` });
-  var imports = {
-    "a": wasmImports
-  };
-  this.setModule = (data3) => {
-    WASMAudioDecoderCommon2.setModule(EmscriptenWASM, data3);
-  };
-  this.getModule = () => WASMAudioDecoderCommon2.getModule(EmscriptenWASM);
-  this.instantiate = () => {
-    this.getModule().then((wasm) => WebAssembly.instantiate(wasm, imports)).then((instance) => {
-      const wasmExports = instance.exports;
-      assignWasmExports(wasmExports);
-      wasmMemory = wasmExports["g"];
-      updateMemoryViews();
-      initRuntime(wasmExports);
-      ready();
-    });
-    this.ready = new Promise((resolve) => {
-      ready = resolve;
-    }).then(() => {
-      this.HEAP = wasmMemory.buffer;
-      this.malloc = _malloc;
-      this.free = _free;
-      this.opus_frame_decoder_create = _opus_frame_decoder_create;
-      this.opus_frame_decode_float_deinterleaved = _opus_frame_decode_float_deinterleaved;
-      this.opus_frame_decoder_destroy = _opus_frame_decoder_destroy;
-    });
-    return this;
-  };
-}
-
-// ../../node_modules/opus-decoder/src/OpusDecoder.js
-function OpusDecoder(options = {}) {
-  if (!OpusDecoder.errors) {
-    Object.defineProperties(OpusDecoder, {
-      errors: {
-        value: /* @__PURE__ */ new Map([
-          [-1, "OPUS_BAD_ARG: One or more invalid/out of range arguments"],
-          [-2, "OPUS_BUFFER_TOO_SMALL: Not enough bytes allocated in the buffer"],
-          [-3, "OPUS_INTERNAL_ERROR: An internal error was detected"],
-          [-4, "OPUS_INVALID_PACKET: The compressed data passed is corrupted"],
-          [-5, "OPUS_UNIMPLEMENTED: Invalid/unsupported request number"],
-          [-6, "OPUS_INVALID_STATE: An encoder or decoder structure is invalid or already freed"],
-          [-7, "OPUS_ALLOC_FAIL: Memory allocation has failed"]
-        ])
-      }
-    });
-  }
-  this._init = () => new this._WASMAudioDecoderCommon(this).instantiate(this._EmscriptenWASM, this._module).then((common) => {
-    this._common = common;
-    this._inputBytes = 0;
-    this._outputSamples = 0;
-    this._frameNumber = 0;
-    this._input = this._common.allocateTypedArray(
-      this._inputSize,
-      Uint8Array
-    );
-    this._output = this._common.allocateTypedArray(
-      this._outputChannels * this._outputChannelSize,
-      Float32Array
-    );
-    const mapping = this._common.allocateTypedArray(
-      this._channels,
-      Uint8Array
-    );
-    mapping.buf.set(this._channelMappingTable);
-    this._decoder = this._common.wasm.opus_frame_decoder_create(
-      this._sampleRate,
-      this._channels,
-      this._streamCount,
-      this._coupledStreamCount,
-      mapping.ptr,
-      this._preSkip,
-      this._forceStereo
-    );
-  });
-  Object.defineProperty(this, "ready", {
-    enumerable: true,
-    get: () => this._ready
-  });
-  this.reset = () => {
-    this.free();
-    return this._init();
-  };
-  this.free = () => {
-    this._common.free();
-    this._common.wasm.opus_frame_decoder_destroy(this._decoder);
-    this._common.wasm.free(this._decoder);
-  };
-  this._decode = (opusFrame) => {
-    if (!(opusFrame instanceof Uint8Array))
-      throw Error(
-        "Data to decode must be Uint8Array. Instead got " + typeof opusFrame
-      );
-    this._input.buf.set(opusFrame);
-    let samplesDecoded = this._common.wasm.opus_frame_decode_float_deinterleaved(
-      this._decoder,
-      this._input.ptr,
-      opusFrame.length,
-      this._output.ptr
-    );
-    let error;
-    if (samplesDecoded < 0) {
-      error = "libopus " + samplesDecoded + " " + (OpusDecoder.errors.get(samplesDecoded) || "Unknown Error");
-      console.error(error);
-      samplesDecoded = 0;
-    }
-    return {
-      outputBuffer: this._common.getOutputChannels(
-        this._output.buf,
-        this._outputChannels,
-        samplesDecoded
-      ),
-      samplesDecoded,
-      error
-    };
-  };
-  this.decodeFrame = (opusFrame) => {
-    let errors = [];
-    const decoded = this._decode(opusFrame);
-    if (decoded.error)
-      this._common.addError(
-        errors,
-        decoded.error,
-        opusFrame.length,
-        this._frameNumber,
-        this._inputBytes,
-        this._outputSamples
-      );
-    this._frameNumber++;
-    this._inputBytes += opusFrame.length;
-    this._outputSamples += decoded.samplesDecoded;
-    return this._WASMAudioDecoderCommon.getDecodedAudioMultiChannel(
-      errors,
-      [decoded.outputBuffer],
-      this._outputChannels,
-      decoded.samplesDecoded,
-      this._sampleRate
-    );
-  };
-  this.decodeFrames = (opusFrames) => {
-    let outputBuffers = [], errors = [], samplesDecoded = 0, i = 0;
-    while (i < opusFrames.length) {
-      const opusFrame = opusFrames[i++];
-      const decoded = this._decode(opusFrame);
-      outputBuffers.push(decoded.outputBuffer);
-      samplesDecoded += decoded.samplesDecoded;
-      if (decoded.error)
-        this._common.addError(
-          errors,
-          decoded.error,
-          opusFrame.length,
-          this._frameNumber,
-          this._inputBytes,
-          this._outputSamples
-        );
-      this._frameNumber++;
-      this._inputBytes += opusFrame.length;
-      this._outputSamples += decoded.samplesDecoded;
-    }
-    return this._WASMAudioDecoderCommon.getDecodedAudioMultiChannel(
-      errors,
-      outputBuffers,
-      this._outputChannels,
-      samplesDecoded,
-      this._sampleRate
-    );
-  };
-  this._isWebWorker = OpusDecoder.isWebWorker;
-  this._WASMAudioDecoderCommon = OpusDecoder.WASMAudioDecoderCommon || WASMAudioDecoderCommon;
-  this._EmscriptenWASM = OpusDecoder.EmscriptenWASM || EmscriptenWASM;
-  this._module = OpusDecoder.module;
-  const MAX_FORCE_STEREO_CHANNELS = 8;
-  const isNumber = (param) => typeof param === "number";
-  const sampleRate2 = options.sampleRate;
-  const channels2 = options.channels;
-  const streamCount2 = options.streamCount;
-  const coupledStreamCount2 = options.coupledStreamCount;
-  const channelMappingTable2 = options.channelMappingTable;
-  const preSkip2 = options.preSkip;
-  const forceStereo = options.forceStereo ? 1 : 0;
-  if (channels2 > 2 && (!isNumber(streamCount2) || !isNumber(coupledStreamCount2) || !Array.isArray(channelMappingTable2))) {
-    throw new Error("Invalid Opus Decoder Options for multichannel decoding.");
-  }
-  this._sampleRate = [8e3, 12e3, 16e3, 24e3, 48e3].includes(sampleRate2) ? sampleRate2 : 48e3;
-  this._channels = isNumber(channels2) ? channels2 : 2;
-  this._streamCount = isNumber(streamCount2) ? streamCount2 : 1;
-  this._coupledStreamCount = isNumber(coupledStreamCount2) ? coupledStreamCount2 : this._channels - 1;
-  this._channelMappingTable = channelMappingTable2 || (this._channels === 2 ? [0, 1] : [0]);
-  this._preSkip = preSkip2 || 0;
-  this._forceStereo = channels2 <= MAX_FORCE_STEREO_CHANNELS && channels2 != 2 ? forceStereo : 0;
-  this._inputSize = 32e3 * 0.12 * this._channels;
-  this._outputChannelSize = 120 * 48;
-  this._outputChannels = this._forceStereo ? 2 : this._channels;
-  this._ready = this._init();
-  return this;
-}
-
-// ../../node_modules/opus-decoder/src/OpusDecoderWebWorker.js
-var OpusDecoderWebWorker = class extends WASMAudioDecoderWorker {
-  constructor(options) {
-    super(options, "opus-decoder", OpusDecoder, EmscriptenWASM);
-  }
-  async decodeFrame(data3) {
-    return this.postToDecoder("decodeFrame", data3);
-  }
-  async decodeFrames(data3) {
-    return this.postToDecoder("decodeFrames", data3);
-  }
-};
-
-// ../../node_modules/opus-decoder/index.js
-assignNames(OpusDecoder, "OpusDecoder");
-assignNames(OpusDecoderWebWorker, "OpusDecoderWebWorker");
-
-// ../../node_modules/codec-parser/src/constants.js
-var symbol = Symbol;
-var mappingJoin = ", ";
-var channelMappings = (() => {
-  const front = "front";
-  const side = "side";
-  const rear = "rear";
-  const left = "left";
-  const center = "center";
-  const right = "right";
-  return ["", front + " ", side + " ", rear + " "].map(
-    (x) => [
-      [left, right],
-      [left, right, center],
-      [left, center, right],
-      [center, left, right],
-      [center]
-    ].flatMap((y) => y.map((z) => x + z).join(mappingJoin))
-  );
-})();
-var lfe = "LFE";
-var monophonic = "monophonic (mono)";
-var stereo = "stereo";
-var surround = "surround";
-var getChannelMapping = (channelCount, ...mappings) => `${[
-  monophonic,
-  stereo,
-  `linear ${surround}`,
-  "quadraphonic",
-  `5.0 ${surround}`,
-  `5.1 ${surround}`,
-  `6.1 ${surround}`,
-  `7.1 ${surround}`
-][channelCount - 1]} (${mappings.join(mappingJoin)})`;
-var vorbisOpusChannelMapping = [
-  monophonic,
-  getChannelMapping(2, channelMappings[0][0]),
-  getChannelMapping(3, channelMappings[0][2]),
-  getChannelMapping(4, channelMappings[1][0], channelMappings[3][0]),
-  getChannelMapping(5, channelMappings[1][2], channelMappings[3][0]),
-  getChannelMapping(6, channelMappings[1][2], channelMappings[3][0], lfe),
-  getChannelMapping(7, channelMappings[1][2], channelMappings[2][0], channelMappings[3][4], lfe),
-  getChannelMapping(8, channelMappings[1][2], channelMappings[2][0], channelMappings[3][0], lfe)
-];
-var rate192000 = 192e3;
-var rate176400 = 176400;
-var rate96000 = 96e3;
-var rate88200 = 88200;
-var rate64000 = 64e3;
-var rate48000 = 48e3;
-var rate44100 = 44100;
-var rate32000 = 32e3;
-var rate24000 = 24e3;
-var rate22050 = 22050;
-var rate16000 = 16e3;
-var rate12000 = 12e3;
-var rate11025 = 11025;
-var rate8000 = 8e3;
-var rate7350 = 7350;
-var absoluteGranulePosition = "absoluteGranulePosition";
-var bandwidth = "bandwidth";
-var bitDepth = "bitDepth";
-var bitrate = "bitrate";
-var bitrateMaximum = bitrate + "Maximum";
-var bitrateMinimum = bitrate + "Minimum";
-var bitrateNominal = bitrate + "Nominal";
-var buffer = "buffer";
-var bufferFullness = buffer + "Fullness";
-var codec = "codec";
-var codecFrames = codec + "Frames";
-var coupledStreamCount = "coupledStreamCount";
-var crc = "crc";
-var crc16 = crc + "16";
-var crc32 = crc + "32";
-var data = "data";
-var description = "description";
-var duration = "duration";
-var emphasis = "emphasis";
-var hasOpusPadding = "hasOpusPadding";
-var header = "header";
-var isContinuedPacket = "isContinuedPacket";
-var isCopyrighted = "isCopyrighted";
-var isFirstPage = "isFirstPage";
-var isHome = "isHome";
-var isLastPage = "isLastPage";
-var isOriginal = "isOriginal";
-var isPrivate = "isPrivate";
-var isVbr = "isVbr";
-var layer = "layer";
-var length = "length";
-var mode = "mode";
-var modeExtension = mode + "Extension";
-var mpeg = "mpeg";
-var mpegVersion = mpeg + "Version";
-var numberAACFrames = "numberAACFrames";
-var outputGain = "outputGain";
-var preSkip = "preSkip";
-var profile = "profile";
-var profileBits = symbol();
-var protection = "protection";
-var rawData = "rawData";
-var segments = "segments";
-var subarray = "subarray";
-var version = "version";
-var vorbis = "vorbis";
-var vorbisComments = vorbis + "Comments";
-var vorbisSetup = vorbis + "Setup";
-var block = "block";
-var blockingStrategy = block + "ingStrategy";
-var blockingStrategyBits = symbol();
-var blockSize = block + "Size";
-var blocksize0 = block + "size0";
-var blocksize1 = block + "size1";
-var blockSizeBits = symbol();
-var channel = "channel";
-var channelMappingFamily = channel + "MappingFamily";
-var channelMappingTable = channel + "MappingTable";
-var channelMode = channel + "Mode";
-var channelModeBits = symbol();
-var channels = channel + "s";
-var copyright = "copyright";
-var copyrightId = copyright + "Id";
-var copyrightIdStart = copyright + "IdStart";
-var frame = "frame";
-var frameCount = frame + "Count";
-var frameLength = frame + "Length";
-var Number2 = "Number";
-var frameNumber = frame + Number2;
-var framePadding = frame + "Padding";
-var frameSize = frame + "Size";
-var Rate = "Rate";
-var inputSampleRate = "inputSample" + Rate;
-var page = "page";
-var pageChecksum = page + "Checksum";
-var pageSegmentBytes = symbol();
-var pageSegmentTable = page + "SegmentTable";
-var pageSequenceNumber = page + "Sequence" + Number2;
-var sample = "sample";
-var sampleNumber = sample + Number2;
-var sampleRate = sample + Rate;
-var sampleRateBits = symbol();
-var samples = sample + "s";
-var stream = "stream";
-var streamCount = stream + "Count";
-var streamInfo = stream + "Info";
-var streamSerialNumber = stream + "Serial" + Number2;
-var streamStructureVersion = stream + "StructureVersion";
-var total = "total";
-var totalBytesOut = total + "BytesOut";
-var totalDuration = total + "Duration";
-var totalSamples = total + "Samples";
-var readRawData = symbol();
-var incrementRawData = symbol();
-var mapCodecFrameStats = symbol();
-var mapFrameStats = symbol();
-var logWarning = symbol();
-var logError2 = symbol();
-var syncFrame = symbol();
-var fixedLengthFrameSync = symbol();
-var getHeader = symbol();
-var setHeader = symbol();
-var getFrame = symbol();
-var parseFrame = symbol();
-var parseOggPage = symbol();
-var checkCodecUpdate = symbol();
-var reset = symbol();
-var enable = symbol();
-var getHeaderFromUint8Array = symbol();
-var checkFrameFooterCrc16 = symbol();
-var uint8Array = Uint8Array;
-var dataView = DataView;
-var reserved = "reserved";
-var bad = "bad";
-var free = "free";
-var none = "none";
-var sixteenBitCRC = "16bit CRC";
-
-// ../../node_modules/codec-parser/src/utilities.js
-var getCrcTable = (crcTable, crcInitialValueFunction, crcFunction) => {
-  for (let byte = 0; byte < crcTable[length]; byte++) {
-    let crc2 = crcInitialValueFunction(byte);
-    for (let bit = 8; bit > 0; bit--) crc2 = crcFunction(crc2);
-    crcTable[byte] = crc2;
-  }
-  return crcTable;
-};
-var crc8Table = getCrcTable(
-  new uint8Array(256),
-  (b) => b,
-  (crc2) => crc2 & 128 ? 7 ^ crc2 << 1 : crc2 << 1
-);
-var flacCrc16Table = [
-  getCrcTable(
-    new Uint16Array(256),
-    (b) => b << 8,
-    (crc2) => crc2 << 1 ^ (crc2 & 1 << 15 ? 32773 : 0)
-  )
-];
-var crc32Table = [
-  getCrcTable(
-    new Uint32Array(256),
-    (b) => b,
-    (crc2) => crc2 >>> 1 ^ (crc2 & 1) * 3988292384
-  )
-];
-for (let i = 0; i < 15; i++) {
-  flacCrc16Table.push(new Uint16Array(256));
-  crc32Table.push(new Uint32Array(256));
-  for (let j = 0; j <= 255; j++) {
-    flacCrc16Table[i + 1][j] = flacCrc16Table[0][flacCrc16Table[i][j] >>> 8] ^ flacCrc16Table[i][j] << 8;
-    crc32Table[i + 1][j] = crc32Table[i][j] >>> 8 ^ crc32Table[0][crc32Table[i][j] & 255];
-  }
-}
-var crc8 = (data3) => {
-  let crc2 = 0;
-  const dataLength = data3[length];
-  for (let i = 0; i !== dataLength; i++) crc2 = crc8Table[crc2 ^ data3[i]];
-  return crc2;
-};
-var flacCrc16 = (data3) => {
-  const dataLength = data3[length];
-  const crcChunkSize = dataLength - 16;
-  let crc2 = 0;
-  let i = 0;
-  while (i <= crcChunkSize) {
-    crc2 ^= data3[i++] << 8 | data3[i++];
-    crc2 = flacCrc16Table[15][crc2 >> 8] ^ flacCrc16Table[14][crc2 & 255] ^ flacCrc16Table[13][data3[i++]] ^ flacCrc16Table[12][data3[i++]] ^ flacCrc16Table[11][data3[i++]] ^ flacCrc16Table[10][data3[i++]] ^ flacCrc16Table[9][data3[i++]] ^ flacCrc16Table[8][data3[i++]] ^ flacCrc16Table[7][data3[i++]] ^ flacCrc16Table[6][data3[i++]] ^ flacCrc16Table[5][data3[i++]] ^ flacCrc16Table[4][data3[i++]] ^ flacCrc16Table[3][data3[i++]] ^ flacCrc16Table[2][data3[i++]] ^ flacCrc16Table[1][data3[i++]] ^ flacCrc16Table[0][data3[i++]];
-  }
-  while (i !== dataLength)
-    crc2 = (crc2 & 255) << 8 ^ flacCrc16Table[0][crc2 >> 8 ^ data3[i++]];
-  return crc2;
-};
-var crc32Function = (data3) => {
-  const dataLength = data3[length];
-  const crcChunkSize = dataLength - 16;
-  let crc2 = 0;
-  let i = 0;
-  while (i <= crcChunkSize)
-    crc2 = crc32Table[15][(data3[i++] ^ crc2) & 255] ^ crc32Table[14][(data3[i++] ^ crc2 >>> 8) & 255] ^ crc32Table[13][(data3[i++] ^ crc2 >>> 16) & 255] ^ crc32Table[12][data3[i++] ^ crc2 >>> 24] ^ crc32Table[11][data3[i++]] ^ crc32Table[10][data3[i++]] ^ crc32Table[9][data3[i++]] ^ crc32Table[8][data3[i++]] ^ crc32Table[7][data3[i++]] ^ crc32Table[6][data3[i++]] ^ crc32Table[5][data3[i++]] ^ crc32Table[4][data3[i++]] ^ crc32Table[3][data3[i++]] ^ crc32Table[2][data3[i++]] ^ crc32Table[1][data3[i++]] ^ crc32Table[0][data3[i++]];
-  while (i !== dataLength)
-    crc2 = crc32Table[0][(crc2 ^ data3[i++]) & 255] ^ crc2 >>> 8;
-  return crc2 ^ -1;
-};
-var concatBuffers = (...buffers) => {
-  const buffer2 = new uint8Array(
-    buffers.reduce((acc, buf) => acc + buf[length], 0)
-  );
-  buffers.reduce((offset, buf) => {
-    buffer2.set(buf, offset);
-    return offset + buf[length];
-  }, 0);
-  return buffer2;
-};
-var bytesToString = (bytes) => String.fromCharCode(...bytes);
-var reverseTable = [0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15];
-var reverse = (val) => reverseTable[val & 15] << 4 | reverseTable[val >> 4];
-var BitReader = class {
-  constructor(data3) {
-    this._data = data3;
-    this._pos = data3[length] * 8;
-  }
-  set position(position) {
-    this._pos = position;
-  }
-  get position() {
-    return this._pos;
-  }
-  read(bits) {
-    const byte = Math.floor(this._pos / 8);
-    const bit = this._pos % 8;
-    this._pos -= bits;
-    const window = (reverse(this._data[byte - 1]) << 8) + reverse(this._data[byte]);
-    return window >> 7 - bit & 255;
-  }
-};
-var readInt64le = (view, offset) => {
-  try {
-    return view.getBigInt64(offset, true);
-  } catch {
-    const sign = view.getUint8(offset + 7) & 128 ? -1 : 1;
-    let firstPart = view.getUint32(offset, true);
-    let secondPart = view.getUint32(offset + 4, true);
-    if (sign === -1) {
-      firstPart = ~firstPart + 1;
-      secondPart = ~secondPart + 1;
-    }
-    if (secondPart > 1048575) {
-      console.warn("This platform does not support BigInt");
-    }
-    return sign * (firstPart + secondPart * 2 ** 32);
-  }
-};
-
-// ../../node_modules/codec-parser/src/codecs/HeaderCache.js
-var HeaderCache = class {
-  constructor(onCodecHeader, onCodecUpdate) {
-    this._onCodecHeader = onCodecHeader;
-    this._onCodecUpdate = onCodecUpdate;
-    this[reset]();
-  }
-  [enable]() {
-    this._isEnabled = true;
-  }
-  [reset]() {
-    this._headerCache = /* @__PURE__ */ new Map();
-    this._codecUpdateData = /* @__PURE__ */ new WeakMap();
-    this._codecHeaderSent = false;
-    this._codecShouldUpdate = false;
-    this._bitrate = null;
-    this._isEnabled = false;
-  }
-  [checkCodecUpdate](bitrate2, totalDuration2) {
-    if (this._onCodecUpdate) {
-      if (this._bitrate !== bitrate2) {
-        this._bitrate = bitrate2;
-        this._codecShouldUpdate = true;
-      }
-      const codecData = this._codecUpdateData.get(
-        this._headerCache.get(this._currentHeader)
-      );
-      if (this._codecShouldUpdate && codecData) {
-        this._onCodecUpdate(
-          {
-            bitrate: bitrate2,
-            ...codecData
-          },
-          totalDuration2
-        );
-      }
-      this._codecShouldUpdate = false;
-    }
-  }
-  [getHeader](key) {
-    const header3 = this._headerCache.get(key);
-    if (header3) {
-      this._updateCurrentHeader(key);
-    }
-    return header3;
-  }
-  [setHeader](key, header3, codecUpdateFields) {
-    if (this._isEnabled) {
-      if (!this._codecHeaderSent) {
-        this._onCodecHeader({ ...header3 });
-        this._codecHeaderSent = true;
-      }
-      this._updateCurrentHeader(key);
-      this._headerCache.set(key, header3);
-      this._codecUpdateData.set(header3, codecUpdateFields);
-    }
-  }
-  _updateCurrentHeader(key) {
-    if (this._onCodecUpdate && key !== this._currentHeader) {
-      this._codecShouldUpdate = true;
-      this._currentHeader = key;
-    }
-  }
-};
-
-// ../../node_modules/codec-parser/src/globals.js
-var headerStore = /* @__PURE__ */ new WeakMap();
-var frameStore = /* @__PURE__ */ new WeakMap();
-
-// ../../node_modules/codec-parser/src/codecs/Parser.js
-var Parser = class {
-  constructor(codecParser, headerCache) {
-    this._codecParser = codecParser;
-    this._headerCache = headerCache;
-  }
-  *[syncFrame]() {
-    let frameData;
-    do {
-      frameData = yield* this.Frame[getFrame](
-        this._codecParser,
-        this._headerCache,
-        0
-      );
-      if (frameData) return frameData;
-      this._codecParser[incrementRawData](1);
-    } while (true);
-  }
-  /**
-   * @description Searches for Frames within bytes containing a sequence of known codec frames.
-   * @param {boolean} ignoreNextFrame Set to true to return frames even if the next frame may not exist at the expected location
-   * @returns {Frame}
-   */
-  *[fixedLengthFrameSync](ignoreNextFrame) {
-    let frameData = yield* this[syncFrame]();
-    const frameLength2 = frameStore.get(frameData)[length];
-    if (ignoreNextFrame || this._codecParser._flushing || // check if there is a frame right after this one
-    (yield* this.Header[getHeader](
-      this._codecParser,
-      this._headerCache,
-      frameLength2
-    ))) {
-      this._headerCache[enable]();
-      this._codecParser[incrementRawData](frameLength2);
-      this._codecParser[mapFrameStats](frameData);
-      return frameData;
-    }
-    this._codecParser[logWarning](
-      `Missing ${frame} at ${frameLength2} bytes from current position.`,
-      `Dropping current ${frame} and trying again.`
-    );
-    this._headerCache[reset]();
-    this._codecParser[incrementRawData](1);
-  }
-};
-
-// ../../node_modules/codec-parser/src/containers/Frame.js
-var Frame = class {
-  constructor(headerValue, dataValue) {
-    frameStore.set(this, { [header]: headerValue });
-    this[data] = dataValue;
-  }
-};
-
-// ../../node_modules/codec-parser/src/codecs/CodecFrame.js
-var CodecFrame = class extends Frame {
-  static *[getFrame](Header, Frame2, codecParser, headerCache, readOffset) {
-    const headerValue = yield* Header[getHeader](
-      codecParser,
-      headerCache,
-      readOffset
-    );
-    if (headerValue) {
-      const frameLengthValue = headerStore.get(headerValue)[frameLength];
-      const samplesValue = headerStore.get(headerValue)[samples];
-      const frame2 = (yield* codecParser[readRawData](
-        frameLengthValue,
-        readOffset
-      ))[subarray](0, frameLengthValue);
-      return new Frame2(headerValue, frame2, samplesValue);
-    } else {
-      return null;
-    }
-  }
-  constructor(headerValue, dataValue, samplesValue) {
-    super(headerValue, dataValue);
-    this[header] = headerValue;
-    this[samples] = samplesValue;
-    this[duration] = samplesValue / headerValue[sampleRate] * 1e3;
-    this[frameNumber] = null;
-    this[totalBytesOut] = null;
-    this[totalSamples] = null;
-    this[totalDuration] = null;
-    frameStore.get(this)[length] = dataValue[length];
-  }
-};
-
-// ../../node_modules/codec-parser/src/metadata/ID3v2.js
-var unsynchronizationFlag = "unsynchronizationFlag";
-var extendedHeaderFlag = "extendedHeaderFlag";
-var experimentalFlag = "experimentalFlag";
-var footerPresent = "footerPresent";
-var ID3v2 = class _ID3v2 {
-  static *getID3v2Header(codecParser, headerCache, readOffset) {
-    const headerLength = 10;
-    const header3 = {};
-    let data3 = yield* codecParser[readRawData](3, readOffset);
-    if (data3[0] !== 73 || data3[1] !== 68 || data3[2] !== 51) return null;
-    data3 = yield* codecParser[readRawData](headerLength, readOffset);
-    header3[version] = `id3v2.${data3[3]}.${data3[4]}`;
-    if (data3[5] & 15) return null;
-    header3[unsynchronizationFlag] = !!(data3[5] & 128);
-    header3[extendedHeaderFlag] = !!(data3[5] & 64);
-    header3[experimentalFlag] = !!(data3[5] & 32);
-    header3[footerPresent] = !!(data3[5] & 16);
-    if (data3[6] & 128 || data3[7] & 128 || data3[8] & 128 || data3[9] & 128)
-      return null;
-    const dataLength = data3[6] << 21 | data3[7] << 14 | data3[8] << 7 | data3[9];
-    header3[length] = headerLength + dataLength;
-    return new _ID3v2(header3);
-  }
-  constructor(header3) {
-    this[version] = header3[version];
-    this[unsynchronizationFlag] = header3[unsynchronizationFlag];
-    this[extendedHeaderFlag] = header3[extendedHeaderFlag];
-    this[experimentalFlag] = header3[experimentalFlag];
-    this[footerPresent] = header3[footerPresent];
-    this[length] = header3[length];
-  }
-};
-
-// ../../node_modules/codec-parser/src/codecs/CodecHeader.js
-var CodecHeader = class {
-  /**
-   * @private
-   */
-  constructor(header3) {
-    headerStore.set(this, header3);
-    this[bitDepth] = header3[bitDepth];
-    this[bitrate] = null;
-    this[channels] = header3[channels];
-    this[channelMode] = header3[channelMode];
-    this[sampleRate] = header3[sampleRate];
-  }
-};
-
-// ../../node_modules/codec-parser/src/codecs/mpeg/MPEGHeader.js
-var bitrateMatrix = {
-  // bits | V1,L1 | V1,L2 | V1,L3 | V2,L1 | V2,L2 & L3
-  0: [free, free, free, free, free],
-  16: [32, 32, 32, 32, 8],
-  // 0b00100000: [64,   48,  40,  48,  16,],
-  // 0b00110000: [96,   56,  48,  56,  24,],
-  // 0b01000000: [128,  64,  56,  64,  32,],
-  // 0b01010000: [160,  80,  64,  80,  40,],
-  // 0b01100000: [192,  96,  80,  96,  48,],
-  // 0b01110000: [224, 112,  96, 112,  56,],
-  // 0b10000000: [256, 128, 112, 128,  64,],
-  // 0b10010000: [288, 160, 128, 144,  80,],
-  // 0b10100000: [320, 192, 160, 160,  96,],
-  // 0b10110000: [352, 224, 192, 176, 112,],
-  // 0b11000000: [384, 256, 224, 192, 128,],
-  // 0b11010000: [416, 320, 256, 224, 144,],
-  // 0b11100000: [448, 384, 320, 256, 160,],
-  240: [bad, bad, bad, bad, bad]
-};
-var calcBitrate = (idx, interval, intervalOffset) => 8 * ((idx + intervalOffset) % interval + interval) * (1 << (idx + intervalOffset) / interval) - 8 * interval * (interval / 8 | 0);
-for (let i = 2; i < 15; i++)
-  bitrateMatrix[i << 4] = [
-    i * 32,
-    //                V1,L1
-    calcBitrate(i, 4, 0),
-    //  V1,L2
-    calcBitrate(i, 4, -1),
-    // V1,L3
-    calcBitrate(i, 8, 4),
-    //  V2,L1
-    calcBitrate(i, 8, 0)
-    //  V2,L2 & L3
-  ];
-var v1Layer1 = 0;
-var v1Layer2 = 1;
-var v1Layer3 = 2;
-var v2Layer1 = 3;
-var v2Layer23 = 4;
-var bands = "bands ";
-var to31 = " to 31";
-var layer12ModeExtensions = {
-  0: bands + 4 + to31,
-  16: bands + 8 + to31,
-  32: bands + 12 + to31,
-  48: bands + 16 + to31
-};
-var bitrateIndex = "bitrateIndex";
-var v2 = "v2";
-var v1 = "v1";
-var intensityStereo = "Intensity stereo ";
-var msStereo = ", MS stereo ";
-var on = "on";
-var off = "off";
-var layer3ModeExtensions = {
-  0: intensityStereo + off + msStereo + off,
-  16: intensityStereo + on + msStereo + off,
-  32: intensityStereo + off + msStereo + on,
-  48: intensityStereo + on + msStereo + on
-};
-var layersValues = {
-  0: { [description]: reserved },
-  2: {
-    [description]: "Layer III",
-    [framePadding]: 1,
-    [modeExtension]: layer3ModeExtensions,
-    [v1]: {
-      [bitrateIndex]: v1Layer3,
-      [samples]: 1152
-    },
-    [v2]: {
-      [bitrateIndex]: v2Layer23,
-      [samples]: 576
-    }
-  },
-  4: {
-    [description]: "Layer II",
-    [framePadding]: 1,
-    [modeExtension]: layer12ModeExtensions,
-    [samples]: 1152,
-    [v1]: {
-      [bitrateIndex]: v1Layer2
-    },
-    [v2]: {
-      [bitrateIndex]: v2Layer23
-    }
-  },
-  6: {
-    [description]: "Layer I",
-    [framePadding]: 4,
-    [modeExtension]: layer12ModeExtensions,
-    [samples]: 384,
-    [v1]: {
-      [bitrateIndex]: v1Layer1
-    },
-    [v2]: {
-      [bitrateIndex]: v2Layer1
-    }
-  }
-};
-var mpegVersionDescription = "MPEG Version ";
-var isoIec = "ISO/IEC ";
-var mpegVersions = {
-  0: {
-    [description]: `${mpegVersionDescription}2.5 (later extension of MPEG 2)`,
-    [layer]: v2,
-    [sampleRate]: {
-      0: rate11025,
-      4: rate12000,
-      8: rate8000,
-      12: reserved
-    }
-  },
-  8: { [description]: reserved },
-  16: {
-    [description]: `${mpegVersionDescription}2 (${isoIec}13818-3)`,
-    [layer]: v2,
-    [sampleRate]: {
-      0: rate22050,
-      4: rate24000,
-      8: rate16000,
-      12: reserved
-    }
-  },
-  24: {
-    [description]: `${mpegVersionDescription}1 (${isoIec}11172-3)`,
-    [layer]: v1,
-    [sampleRate]: {
-      0: rate44100,
-      4: rate48000,
-      8: rate32000,
-      12: reserved
-    }
-  },
-  length
-};
-var protectionValues = {
-  0: sixteenBitCRC,
-  1: none
-};
-var emphasisValues = {
-  0: none,
-  1: "50/15 ms",
-  2: reserved,
-  3: "CCIT J.17"
-};
-var channelModes = {
-  0: { [channels]: 2, [description]: stereo },
-  64: { [channels]: 2, [description]: "joint " + stereo },
-  128: { [channels]: 2, [description]: "dual channel" },
-  192: { [channels]: 1, [description]: monophonic }
-};
-var MPEGHeader = class _MPEGHeader extends CodecHeader {
-  static *[getHeader](codecParser, headerCache, readOffset) {
-    const header3 = {};
-    const id3v2Header = yield* ID3v2.getID3v2Header(
-      codecParser,
-      headerCache,
-      readOffset
-    );
-    if (id3v2Header) {
-      yield* codecParser[readRawData](id3v2Header[length], readOffset);
-      codecParser[incrementRawData](id3v2Header[length]);
-    }
-    const data3 = yield* codecParser[readRawData](4, readOffset);
-    const key = bytesToString(data3[subarray](0, 4));
-    const cachedHeader = headerCache[getHeader](key);
-    if (cachedHeader) return new _MPEGHeader(cachedHeader);
-    if (data3[0] !== 255 || data3[1] < 224) return null;
-    const mpegVersionValues2 = mpegVersions[data3[1] & 24];
-    if (mpegVersionValues2[description] === reserved) return null;
-    const layerBits = data3[1] & 6;
-    if (layersValues[layerBits][description] === reserved) return null;
-    const layerValues2 = {
-      ...layersValues[layerBits],
-      ...layersValues[layerBits][mpegVersionValues2[layer]]
-    };
-    header3[mpegVersion] = mpegVersionValues2[description];
-    header3[layer] = layerValues2[description];
-    header3[samples] = layerValues2[samples];
-    header3[protection] = protectionValues[data3[1] & 1];
-    header3[length] = 4;
-    header3[bitrate] = bitrateMatrix[data3[2] & 240][layerValues2[bitrateIndex]];
-    if (header3[bitrate] === bad) return null;
-    header3[sampleRate] = mpegVersionValues2[sampleRate][data3[2] & 12];
-    if (header3[sampleRate] === reserved) return null;
-    header3[framePadding] = data3[2] & 2 && layerValues2[framePadding];
-    header3[isPrivate] = !!(data3[2] & 1);
-    header3[frameLength] = Math.floor(
-      125 * header3[bitrate] * header3[samples] / header3[sampleRate] + header3[framePadding]
-    );
-    if (!header3[frameLength]) return null;
-    const channelModeBits2 = data3[3] & 192;
-    header3[channelMode] = channelModes[channelModeBits2][description];
-    header3[channels] = channelModes[channelModeBits2][channels];
-    header3[modeExtension] = layerValues2[modeExtension][data3[3] & 48];
-    header3[isCopyrighted] = !!(data3[3] & 8);
-    header3[isOriginal] = !!(data3[3] & 4);
-    header3[emphasis] = emphasisValues[data3[3] & 3];
-    if (header3[emphasis] === reserved) return null;
-    header3[bitDepth] = 16;
-    {
-      const { length: length2, frameLength: frameLength2, samples: samples2, ...codecUpdateFields } = header3;
-      headerCache[setHeader](key, header3, codecUpdateFields);
-    }
-    return new _MPEGHeader(header3);
-  }
-  /**
-   * @private
-   * Call MPEGHeader.getHeader(Array<Uint8>) to get instance
-   */
-  constructor(header3) {
-    super(header3);
-    this[bitrate] = header3[bitrate];
-    this[emphasis] = header3[emphasis];
-    this[framePadding] = header3[framePadding];
-    this[isCopyrighted] = header3[isCopyrighted];
-    this[isOriginal] = header3[isOriginal];
-    this[isPrivate] = header3[isPrivate];
-    this[layer] = header3[layer];
-    this[modeExtension] = header3[modeExtension];
-    this[mpegVersion] = header3[mpegVersion];
-    this[protection] = header3[protection];
-  }
-};
-
-// ../../node_modules/codec-parser/src/codecs/mpeg/MPEGFrame.js
-var MPEGFrame = class _MPEGFrame extends CodecFrame {
-  static *[getFrame](codecParser, headerCache, readOffset) {
-    return yield* super[getFrame](
-      MPEGHeader,
-      _MPEGFrame,
-      codecParser,
-      headerCache,
-      readOffset
-    );
-  }
-  constructor(header3, frame2, samples2) {
-    super(header3, frame2, samples2);
-  }
-};
-
-// ../../node_modules/codec-parser/src/codecs/mpeg/MPEGParser.js
-var MPEGParser = class extends Parser {
-  constructor(codecParser, headerCache, onCodec) {
-    super(codecParser, headerCache);
-    this.Frame = MPEGFrame;
-    this.Header = MPEGHeader;
-    onCodec(this[codec]);
-  }
-  get [codec]() {
-    return mpeg;
-  }
-  *[parseFrame]() {
-    return yield* this[fixedLengthFrameSync]();
-  }
-};
-
-// ../../node_modules/codec-parser/src/codecs/aac/AACHeader.js
-var mpegVersionValues = {
-  0: "MPEG-4",
-  8: "MPEG-2"
-};
-var layerValues = {
-  0: "valid",
-  2: bad,
-  4: bad,
-  6: bad
-};
-var protectionValues2 = {
-  0: sixteenBitCRC,
-  1: none
-};
-var profileValues = {
-  0: "AAC Main",
-  64: "AAC LC (Low Complexity)",
-  128: "AAC SSR (Scalable Sample Rate)",
-  192: "AAC LTP (Long Term Prediction)"
-};
-var sampleRates = {
-  0: rate96000,
-  4: rate88200,
-  8: rate64000,
-  12: rate48000,
-  16: rate44100,
-  20: rate32000,
-  24: rate24000,
-  28: rate22050,
-  32: rate16000,
-  36: rate12000,
-  40: rate11025,
-  44: rate8000,
-  48: rate7350,
-  52: reserved,
-  56: reserved,
-  60: "frequency is written explicitly"
-};
-var channelModeValues = {
-  0: { [channels]: 0, [description]: "Defined in AOT Specific Config" },
-  /*
-  'monophonic (mono)'
-  'stereo (left, right)'
-  'linear surround (front center, front left, front right)'
-  'quadraphonic (front center, front left, front right, rear center)'
-  '5.0 surround (front center, front left, front right, rear left, rear right)'
-  '5.1 surround (front center, front left, front right, rear left, rear right, LFE)'
-  '7.1 surround (front center, front left, front right, side left, side right, rear left, rear right, LFE)'
-  */
-  64: { [channels]: 1, [description]: monophonic },
-  128: { [channels]: 2, [description]: getChannelMapping(2, channelMappings[0][0]) },
-  192: { [channels]: 3, [description]: getChannelMapping(3, channelMappings[1][3]) },
-  256: { [channels]: 4, [description]: getChannelMapping(4, channelMappings[1][3], channelMappings[3][4]) },
-  320: { [channels]: 5, [description]: getChannelMapping(5, channelMappings[1][3], channelMappings[3][0]) },
-  384: { [channels]: 6, [description]: getChannelMapping(6, channelMappings[1][3], channelMappings[3][0], lfe) },
-  448: { [channels]: 8, [description]: getChannelMapping(8, channelMappings[1][3], channelMappings[2][0], channelMappings[3][0], lfe) }
-};
-var AACHeader = class _AACHeader extends CodecHeader {
-  static *[getHeader](codecParser, headerCache, readOffset) {
-    const header3 = {};
-    const data3 = yield* codecParser[readRawData](7, readOffset);
-    const key = bytesToString([
-      data3[0],
-      data3[1],
-      data3[2],
-      data3[3] & 252 | data3[6] & 3
-      // frame length, buffer fullness varies so don't cache it
-    ]);
-    const cachedHeader = headerCache[getHeader](key);
-    if (!cachedHeader) {
-      if (data3[0] !== 255 || data3[1] < 240) return null;
-      header3[mpegVersion] = mpegVersionValues[data3[1] & 8];
-      header3[layer] = layerValues[data3[1] & 6];
-      if (header3[layer] === bad) return null;
-      const protectionBit = data3[1] & 1;
-      header3[protection] = protectionValues2[protectionBit];
-      header3[length] = protectionBit ? 7 : 9;
-      header3[profileBits] = data3[2] & 192;
-      header3[sampleRateBits] = data3[2] & 60;
-      const privateBit = data3[2] & 2;
-      header3[profile] = profileValues[header3[profileBits]];
-      header3[sampleRate] = sampleRates[header3[sampleRateBits]];
-      if (header3[sampleRate] === reserved) return null;
-      header3[isPrivate] = !!privateBit;
-      header3[channelModeBits] = (data3[2] << 8 | data3[3]) & 448;
-      header3[channelMode] = channelModeValues[header3[channelModeBits]][description];
-      header3[channels] = channelModeValues[header3[channelModeBits]][channels];
-      header3[isOriginal] = !!(data3[3] & 32);
-      header3[isHome] = !!(data3[3] & 8);
-      header3[copyrightId] = !!(data3[3] & 8);
-      header3[copyrightIdStart] = !!(data3[3] & 4);
-      header3[bitDepth] = 16;
-      header3[samples] = 1024;
-      header3[numberAACFrames] = data3[6] & 3;
-      {
-        const {
-          length: length2,
-          channelModeBits: channelModeBits2,
-          profileBits: profileBits2,
-          sampleRateBits: sampleRateBits2,
-          frameLength: frameLength2,
-          samples: samples2,
-          numberAACFrames: numberAACFrames2,
-          ...codecUpdateFields
-        } = header3;
-        headerCache[setHeader](key, header3, codecUpdateFields);
-      }
-    } else {
-      Object.assign(header3, cachedHeader);
-    }
-    header3[frameLength] = (data3[3] << 11 | data3[4] << 3 | data3[5] >> 5) & 8191;
-    if (!header3[frameLength]) return null;
-    const bufferFullnessBits = (data3[5] << 6 | data3[6] >> 2) & 2047;
-    header3[bufferFullness] = bufferFullnessBits === 2047 ? "VBR" : bufferFullnessBits;
-    return new _AACHeader(header3);
-  }
-  /**
-   * @private
-   * Call AACHeader.getHeader(Array<Uint8>) to get instance
-   */
-  constructor(header3) {
-    super(header3);
-    this[copyrightId] = header3[copyrightId];
-    this[copyrightIdStart] = header3[copyrightIdStart];
-    this[bufferFullness] = header3[bufferFullness];
-    this[isHome] = header3[isHome];
-    this[isOriginal] = header3[isOriginal];
-    this[isPrivate] = header3[isPrivate];
-    this[layer] = header3[layer];
-    this[length] = header3[length];
-    this[mpegVersion] = header3[mpegVersion];
-    this[numberAACFrames] = header3[numberAACFrames];
-    this[profile] = header3[profile];
-    this[protection] = header3[protection];
-  }
-  get audioSpecificConfig() {
-    const header3 = headerStore.get(this);
-    const audioSpecificConfig = header3[profileBits] + 64 << 5 | header3[sampleRateBits] << 5 | header3[channelModeBits] >> 3;
-    const bytes = new uint8Array(2);
-    new dataView(bytes[buffer]).setUint16(0, audioSpecificConfig, false);
-    return bytes;
-  }
-};
-
-// ../../node_modules/codec-parser/src/codecs/aac/AACFrame.js
-var AACFrame = class _AACFrame extends CodecFrame {
-  static *[getFrame](codecParser, headerCache, readOffset) {
-    return yield* super[getFrame](
-      AACHeader,
-      _AACFrame,
-      codecParser,
-      headerCache,
-      readOffset
-    );
-  }
-  constructor(header3, frame2, samples2) {
-    super(header3, frame2, samples2);
-  }
-};
-
-// ../../node_modules/codec-parser/src/codecs/aac/AACParser.js
-var AACParser = class extends Parser {
-  constructor(codecParser, headerCache, onCodec) {
-    super(codecParser, headerCache);
-    this.Frame = AACFrame;
-    this.Header = AACHeader;
-    onCodec(this[codec]);
-  }
-  get [codec]() {
-    return "aac";
-  }
-  *[parseFrame]() {
-    return yield* this[fixedLengthFrameSync]();
-  }
-};
-
-// ../../node_modules/codec-parser/src/codecs/flac/FLACFrame.js
-var FLACFrame = class _FLACFrame extends CodecFrame {
-  static _getFrameFooterCrc16(data3) {
-    return (data3[data3[length] - 2] << 8) + data3[data3[length] - 1];
-  }
-  // check frame footer crc
-  // https://xiph.org/flac/format.html#frame_footer
-  static [checkFrameFooterCrc16](data3) {
-    const expectedCrc16 = _FLACFrame._getFrameFooterCrc16(data3);
-    const actualCrc16 = flacCrc16(data3[subarray](0, -2));
-    return expectedCrc16 === actualCrc16;
-  }
-  constructor(data3, header3, streamInfoValue) {
-    header3[streamInfo] = streamInfoValue;
-    header3[crc16] = _FLACFrame._getFrameFooterCrc16(data3);
-    super(header3, data3, headerStore.get(header3)[samples]);
-  }
-};
-
-// ../../node_modules/codec-parser/src/codecs/flac/FLACHeader.js
-var getFromStreamInfo = "get from STREAMINFO metadata block";
-var blockingStrategyValues = {
-  0: "Fixed",
-  1: "Variable"
-};
-var blockSizeValues = {
-  0: reserved,
-  16: 192
-  // 0b00100000: 576,
-  // 0b00110000: 1152,
-  // 0b01000000: 2304,
-  // 0b01010000: 4608,
-  // 0b01100000: "8-bit (blocksize-1) from end of header",
-  // 0b01110000: "16-bit (blocksize-1) from end of header",
-  // 0b10000000: 256,
-  // 0b10010000: 512,
-  // 0b10100000: 1024,
-  // 0b10110000: 2048,
-  // 0b11000000: 4096,
-  // 0b11010000: 8192,
-  // 0b11100000: 16384,
-  // 0b11110000: 32768,
-};
-for (let i = 2; i < 16; i++)
-  blockSizeValues[i << 4] = i < 6 ? 576 * 2 ** (i - 2) : 2 ** i;
-var sampleRateValues = {
-  0: getFromStreamInfo,
-  1: rate88200,
-  2: rate176400,
-  3: rate192000,
-  4: rate8000,
-  5: rate16000,
-  6: rate22050,
-  7: rate24000,
-  8: rate32000,
-  9: rate44100,
-  10: rate48000,
-  11: rate96000,
-  // 0b00001100: "8-bit sample rate (in kHz) from end of header",
-  // 0b00001101: "16-bit sample rate (in Hz) from end of header",
-  // 0b00001110: "16-bit sample rate (in tens of Hz) from end of header",
-  15: bad
-};
-var channelAssignments = {
-  /*'
-  'monophonic (mono)'
-  'stereo (left, right)'
-  'linear surround (left, right, center)'
-  'quadraphonic (front left, front right, rear left, rear right)'
-  '5.0 surround (front left, front right, front center, rear left, rear right)'
-  '5.1 surround (front left, front right, front center, LFE, rear left, rear right)'
-  '6.1 surround (front left, front right, front center, LFE, rear center, side left, side right)'
-  '7.1 surround (front left, front right, front center, LFE, rear left, rear right, side left, side right)'
-  */
-  0: { [channels]: 1, [description]: monophonic },
-  16: { [channels]: 2, [description]: getChannelMapping(2, channelMappings[0][0]) },
-  32: { [channels]: 3, [description]: getChannelMapping(3, channelMappings[0][1]) },
-  48: { [channels]: 4, [description]: getChannelMapping(4, channelMappings[1][0], channelMappings[3][0]) },
-  64: { [channels]: 5, [description]: getChannelMapping(5, channelMappings[1][1], channelMappings[3][0]) },
-  80: { [channels]: 6, [description]: getChannelMapping(6, channelMappings[1][1], lfe, channelMappings[3][0]) },
-  96: { [channels]: 7, [description]: getChannelMapping(7, channelMappings[1][1], lfe, channelMappings[3][4], channelMappings[2][0]) },
-  112: { [channels]: 8, [description]: getChannelMapping(8, channelMappings[1][1], lfe, channelMappings[3][0], channelMappings[2][0]) },
-  128: { [channels]: 2, [description]: `${stereo} (left, diff)` },
-  144: { [channels]: 2, [description]: `${stereo} (diff, right)` },
-  160: { [channels]: 2, [description]: `${stereo} (avg, diff)` },
-  176: reserved,
-  192: reserved,
-  208: reserved,
-  224: reserved,
-  240: reserved
-};
-var bitDepthValues = {
-  0: getFromStreamInfo,
-  2: 8,
-  4: 12,
-  6: reserved,
-  8: 16,
-  10: 20,
-  12: 24,
-  14: reserved
-};
-var FLACHeader = class _FLACHeader extends CodecHeader {
-  // https://datatracker.ietf.org/doc/html/rfc3629#section-3
-  //    Char. number range  |        UTF-8 octet sequence
-  //    (hexadecimal)    |              (binary)
-  // --------------------+---------------------------------------------
-  // 0000 0000-0000 007F | 0xxxxxxx
-  // 0000 0080-0000 07FF | 110xxxxx 10xxxxxx
-  // 0000 0800-0000 FFFF | 1110xxxx 10xxxxxx 10xxxxxx
-  // 0001 0000-0010 FFFF | 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
-  static _decodeUTF8Int(data3) {
-    if (data3[0] > 254) {
-      return null;
-    }
-    if (data3[0] < 128) return { value: data3[0], length: 1 };
-    let length2 = 1;
-    for (let zeroMask = 64; zeroMask & data3[0]; zeroMask >>= 1) length2++;
-    let idx = length2 - 1, value = 0, shift = 0;
-    for (; idx > 0; shift += 6, idx--) {
-      if ((data3[idx] & 192) !== 128) {
-        return null;
-      }
-      value |= (data3[idx] & 63) << shift;
-    }
-    value |= (data3[idx] & 127 >> length2) << shift;
-    return { value, length: length2 };
-  }
-  static [getHeaderFromUint8Array](data3, headerCache) {
-    const codecParserStub = {
-      [readRawData]: function* () {
-        return data3;
-      }
-    };
-    return _FLACHeader[getHeader](codecParserStub, headerCache, 0).next().value;
-  }
-  static *[getHeader](codecParser, headerCache, readOffset) {
-    let data3 = yield* codecParser[readRawData](6, readOffset);
-    if (data3[0] !== 255 || !(data3[1] === 248 || data3[1] === 249)) {
-      return null;
-    }
-    const header3 = {};
-    const key = bytesToString(data3[subarray](0, 4));
-    const cachedHeader = headerCache[getHeader](key);
-    if (!cachedHeader) {
-      header3[blockingStrategyBits] = data3[1] & 1;
-      header3[blockingStrategy] = blockingStrategyValues[header3[blockingStrategyBits]];
-      header3[blockSizeBits] = data3[2] & 240;
-      header3[sampleRateBits] = data3[2] & 15;
-      header3[blockSize] = blockSizeValues[header3[blockSizeBits]];
-      if (header3[blockSize] === reserved) {
-        return null;
-      }
-      header3[sampleRate] = sampleRateValues[header3[sampleRateBits]];
-      if (header3[sampleRate] === bad) {
-        return null;
-      }
-      if (data3[3] & 1) {
-        return null;
-      }
-      const channelAssignment = channelAssignments[data3[3] & 240];
-      if (channelAssignment === reserved) {
-        return null;
-      }
-      header3[channels] = channelAssignment[channels];
-      header3[channelMode] = channelAssignment[description];
-      header3[bitDepth] = bitDepthValues[data3[3] & 14];
-      if (header3[bitDepth] === reserved) {
-        return null;
-      }
-    } else {
-      Object.assign(header3, cachedHeader);
-    }
-    header3[length] = 5;
-    data3 = yield* codecParser[readRawData](header3[length] + 8, readOffset);
-    const decodedUtf8 = _FLACHeader._decodeUTF8Int(data3[subarray](4));
-    if (!decodedUtf8) {
-      return null;
-    }
-    if (header3[blockingStrategyBits]) {
-      header3[sampleNumber] = decodedUtf8.value;
-    } else {
-      header3[frameNumber] = decodedUtf8.value;
-    }
-    header3[length] += decodedUtf8[length];
-    if (header3[blockSizeBits] === 96) {
-      if (data3[length] < header3[length])
-        data3 = yield* codecParser[readRawData](header3[length], readOffset);
-      header3[blockSize] = data3[header3[length] - 1] + 1;
-      header3[length] += 1;
-    } else if (header3[blockSizeBits] === 112) {
-      if (data3[length] < header3[length])
-        data3 = yield* codecParser[readRawData](header3[length], readOffset);
-      header3[blockSize] = (data3[header3[length] - 1] << 8) + data3[header3[length]] + 1;
-      header3[length] += 2;
-    }
-    header3[samples] = header3[blockSize];
-    if (header3[sampleRateBits] === 12) {
-      if (data3[length] < header3[length])
-        data3 = yield* codecParser[readRawData](header3[length], readOffset);
-      header3[sampleRate] = data3[header3[length] - 1] * 1e3;
-      header3[length] += 1;
-    } else if (header3[sampleRateBits] === 13) {
-      if (data3[length] < header3[length])
-        data3 = yield* codecParser[readRawData](header3[length], readOffset);
-      header3[sampleRate] = (data3[header3[length] - 1] << 8) + data3[header3[length]];
-      header3[length] += 2;
-    } else if (header3[sampleRateBits] === 14) {
-      if (data3[length] < header3[length])
-        data3 = yield* codecParser[readRawData](header3[length], readOffset);
-      header3[sampleRate] = ((data3[header3[length] - 1] << 8) + data3[header3[length]]) * 10;
-      header3[length] += 2;
-    }
-    if (data3[length] < header3[length])
-      data3 = yield* codecParser[readRawData](header3[length], readOffset);
-    header3[crc] = data3[header3[length] - 1];
-    if (header3[crc] !== crc8(data3[subarray](0, header3[length] - 1))) {
-      return null;
-    }
-    {
-      if (!cachedHeader) {
-        const {
-          blockingStrategyBits: blockingStrategyBits2,
-          frameNumber: frameNumber2,
-          sampleNumber: sampleNumber2,
-          samples: samples2,
-          sampleRateBits: sampleRateBits2,
-          blockSizeBits: blockSizeBits2,
-          crc: crc2,
-          length: length2,
-          ...codecUpdateFields
-        } = header3;
-        headerCache[setHeader](key, header3, codecUpdateFields);
-      }
-    }
-    return new _FLACHeader(header3);
-  }
-  /**
-   * @private
-   * Call FLACHeader.getHeader(Array<Uint8>) to get instance
-   */
-  constructor(header3) {
-    super(header3);
-    this[crc16] = null;
-    this[blockingStrategy] = header3[blockingStrategy];
-    this[blockSize] = header3[blockSize];
-    this[frameNumber] = header3[frameNumber];
-    this[sampleNumber] = header3[sampleNumber];
-    this[streamInfo] = null;
-  }
-};
-
-// ../../node_modules/codec-parser/src/codecs/flac/FLACParser.js
-var MIN_FLAC_FRAME_SIZE = 2;
-var MAX_FLAC_FRAME_SIZE = 512 * 1024;
-var FLACParser = class extends Parser {
-  constructor(codecParser, headerCache, onCodec) {
-    super(codecParser, headerCache);
-    this.Frame = FLACFrame;
-    this.Header = FLACHeader;
-    onCodec(this[codec]);
-  }
-  get [codec]() {
-    return "flac";
-  }
-  *_getNextFrameSyncOffset(offset) {
-    const data3 = yield* this._codecParser[readRawData](2, 0);
-    const dataLength = data3[length] - 2;
-    while (offset < dataLength) {
-      const firstByte = data3[offset];
-      if (firstByte === 255) {
-        const secondByte = data3[offset + 1];
-        if (secondByte === 248 || secondByte === 249) break;
-        if (secondByte !== 255) offset++;
-      }
-      offset++;
-    }
-    return offset;
-  }
-  *[parseFrame]() {
-    do {
-      const header3 = yield* FLACHeader[getHeader](
-        this._codecParser,
-        this._headerCache,
-        0
-      );
-      if (header3) {
-        let nextHeaderOffset = headerStore.get(header3)[length] + MIN_FLAC_FRAME_SIZE;
-        while (nextHeaderOffset <= MAX_FLAC_FRAME_SIZE) {
-          if (this._codecParser._flushing || (yield* FLACHeader[getHeader](
-            this._codecParser,
-            this._headerCache,
-            nextHeaderOffset
-          ))) {
-            let frameData = yield* this._codecParser[readRawData](nextHeaderOffset);
-            if (!this._codecParser._flushing)
-              frameData = frameData[subarray](0, nextHeaderOffset);
-            if (FLACFrame[checkFrameFooterCrc16](frameData)) {
-              const frame2 = new FLACFrame(frameData, header3);
-              this._headerCache[enable]();
-              this._codecParser[incrementRawData](nextHeaderOffset);
-              this._codecParser[mapFrameStats](frame2);
-              return frame2;
-            }
-          }
-          nextHeaderOffset = yield* this._getNextFrameSyncOffset(
-            nextHeaderOffset + 1
-          );
-        }
-        this._codecParser[logWarning](
-          `Unable to sync FLAC frame after searching ${nextHeaderOffset} bytes.`
-        );
-        this._codecParser[incrementRawData](nextHeaderOffset);
-      } else {
-        this._codecParser[incrementRawData](
-          yield* this._getNextFrameSyncOffset(1)
-        );
-      }
-    } while (true);
-  }
-  [parseOggPage](oggPage) {
-    if (oggPage[pageSequenceNumber] === 0) {
-      this._headerCache[enable]();
-      this._streamInfo = oggPage[data][subarray](13);
-    } else if (oggPage[pageSequenceNumber] === 1) {
-    } else {
-      oggPage[codecFrames] = frameStore.get(oggPage)[segments].map((segment) => {
-        const header3 = FLACHeader[getHeaderFromUint8Array](
-          segment,
-          this._headerCache
-        );
-        if (header3) {
-          return new FLACFrame(segment, header3, this._streamInfo);
-        } else {
-          this._codecParser[logWarning](
-            "Failed to parse Ogg FLAC frame",
-            "Skipping invalid FLAC frame"
-          );
-        }
-      }).filter((frame2) => !!frame2);
-    }
-    return oggPage;
-  }
-};
-
-// ../../node_modules/codec-parser/src/containers/ogg/OggPageHeader.js
-var OggPageHeader = class _OggPageHeader {
-  static *[getHeader](codecParser, headerCache, readOffset) {
-    const header3 = {};
-    let data3 = yield* codecParser[readRawData](28, readOffset);
-    if (data3[0] !== 79 || // O
-    data3[1] !== 103 || // g
-    data3[2] !== 103 || // g
-    data3[3] !== 83) {
-      return null;
-    }
-    header3[streamStructureVersion] = data3[4];
-    const zeros = data3[5] & 248;
-    if (zeros) return null;
-    header3[isLastPage] = !!(data3[5] & 4);
-    header3[isFirstPage] = !!(data3[5] & 2);
-    header3[isContinuedPacket] = !!(data3[5] & 1);
-    const view = new dataView(uint8Array.from(data3[subarray](0, 28))[buffer]);
-    header3[absoluteGranulePosition] = readInt64le(view, 6);
-    header3[streamSerialNumber] = view.getInt32(14, true);
-    header3[pageSequenceNumber] = view.getInt32(18, true);
-    header3[pageChecksum] = view.getInt32(22, true);
-    const pageSegmentTableLength = data3[26];
-    header3[length] = pageSegmentTableLength + 27;
-    data3 = yield* codecParser[readRawData](header3[length], readOffset);
-    header3[frameLength] = 0;
-    header3[pageSegmentTable] = [];
-    header3[pageSegmentBytes] = uint8Array.from(
-      data3[subarray](27, header3[length])
-    );
-    for (let i = 0, segmentLength = 0; i < pageSegmentTableLength; i++) {
-      const segmentByte = header3[pageSegmentBytes][i];
-      header3[frameLength] += segmentByte;
-      segmentLength += segmentByte;
-      if (segmentByte !== 255 || i === pageSegmentTableLength - 1) {
-        header3[pageSegmentTable].push(segmentLength);
-        segmentLength = 0;
-      }
-    }
-    return new _OggPageHeader(header3);
-  }
-  /**
-   * @private
-   * Call OggPageHeader.getHeader(Array<Uint8>) to get instance
-   */
-  constructor(header3) {
-    headerStore.set(this, header3);
-    this[absoluteGranulePosition] = header3[absoluteGranulePosition];
-    this[isContinuedPacket] = header3[isContinuedPacket];
-    this[isFirstPage] = header3[isFirstPage];
-    this[isLastPage] = header3[isLastPage];
-    this[pageSegmentTable] = header3[pageSegmentTable];
-    this[pageSequenceNumber] = header3[pageSequenceNumber];
-    this[pageChecksum] = header3[pageChecksum];
-    this[streamSerialNumber] = header3[streamSerialNumber];
-  }
-};
-
-// ../../node_modules/codec-parser/src/containers/ogg/OggPage.js
-var OggPage = class _OggPage extends Frame {
-  static *[getFrame](codecParser, headerCache, readOffset) {
-    const header3 = yield* OggPageHeader[getHeader](
-      codecParser,
-      headerCache,
-      readOffset
-    );
-    if (header3) {
-      const frameLengthValue = headerStore.get(header3)[frameLength];
-      const headerLength = headerStore.get(header3)[length];
-      const totalLength = headerLength + frameLengthValue;
-      const rawDataValue = (yield* codecParser[readRawData](totalLength, 0))[subarray](0, totalLength);
-      const frame2 = rawDataValue[subarray](headerLength, totalLength);
-      return new _OggPage(header3, frame2, rawDataValue);
-    } else {
-      return null;
-    }
-  }
-  constructor(header3, frame2, rawDataValue) {
-    super(header3, frame2);
-    frameStore.get(this)[length] = rawDataValue[length];
-    this[codecFrames] = [];
-    this[rawData] = rawDataValue;
-    this[absoluteGranulePosition] = header3[absoluteGranulePosition];
-    this[crc32] = header3[pageChecksum];
-    this[duration] = 0;
-    this[isContinuedPacket] = header3[isContinuedPacket];
-    this[isFirstPage] = header3[isFirstPage];
-    this[isLastPage] = header3[isLastPage];
-    this[pageSequenceNumber] = header3[pageSequenceNumber];
-    this[samples] = 0;
-    this[streamSerialNumber] = header3[streamSerialNumber];
-  }
-};
-
-// ../../node_modules/codec-parser/src/codecs/opus/OpusFrame.js
-var OpusFrame = class extends CodecFrame {
-  constructor(data3, header3, samples2) {
-    super(header3, data3, samples2);
-  }
-};
-
-// ../../node_modules/codec-parser/src/codecs/opus/OpusHeader.js
-var channelMappingFamilies = {
-  0: vorbisOpusChannelMapping.slice(0, 2),
-  /*
-  0: "monophonic (mono)"
-  1: "stereo (left, right)"
-  */
-  1: vorbisOpusChannelMapping
-  /*
-  0: "monophonic (mono)"
-  1: "stereo (left, right)"
-  2: "linear surround (left, center, right)"
-  3: "quadraphonic (front left, front right, rear left, rear right)"
-  4: "5.0 surround (front left, front center, front right, rear left, rear right)"
-  5: "5.1 surround (front left, front center, front right, rear left, rear right, LFE)"
-  6: "6.1 surround (front left, front center, front right, side left, side right, rear center, LFE)"
-  7: "7.1 surround (front left, front center, front right, side left, side right, rear left, rear right, LFE)"
-  */
-  // additional channel mappings are user defined
-};
-var silkOnly = "SILK-only";
-var celtOnly = "CELT-only";
-var hybrid = "Hybrid";
-var narrowBand = "narrowband";
-var mediumBand = "medium-band";
-var wideBand = "wideband";
-var superWideBand = "super-wideband";
-var fullBand = "fullband";
-var configTable = {
-  0: { [mode]: silkOnly, [bandwidth]: narrowBand, [frameSize]: 10 },
-  8: { [mode]: silkOnly, [bandwidth]: narrowBand, [frameSize]: 20 },
-  16: { [mode]: silkOnly, [bandwidth]: narrowBand, [frameSize]: 40 },
-  24: { [mode]: silkOnly, [bandwidth]: narrowBand, [frameSize]: 60 },
-  32: { [mode]: silkOnly, [bandwidth]: mediumBand, [frameSize]: 10 },
-  40: { [mode]: silkOnly, [bandwidth]: mediumBand, [frameSize]: 20 },
-  48: { [mode]: silkOnly, [bandwidth]: mediumBand, [frameSize]: 40 },
-  56: { [mode]: silkOnly, [bandwidth]: mediumBand, [frameSize]: 60 },
-  64: { [mode]: silkOnly, [bandwidth]: wideBand, [frameSize]: 10 },
-  72: { [mode]: silkOnly, [bandwidth]: wideBand, [frameSize]: 20 },
-  80: { [mode]: silkOnly, [bandwidth]: wideBand, [frameSize]: 40 },
-  88: { [mode]: silkOnly, [bandwidth]: wideBand, [frameSize]: 60 },
-  96: { [mode]: hybrid, [bandwidth]: superWideBand, [frameSize]: 10 },
-  104: { [mode]: hybrid, [bandwidth]: superWideBand, [frameSize]: 20 },
-  112: { [mode]: hybrid, [bandwidth]: fullBand, [frameSize]: 10 },
-  120: { [mode]: hybrid, [bandwidth]: fullBand, [frameSize]: 20 },
-  128: { [mode]: celtOnly, [bandwidth]: narrowBand, [frameSize]: 2.5 },
-  136: { [mode]: celtOnly, [bandwidth]: narrowBand, [frameSize]: 5 },
-  144: { [mode]: celtOnly, [bandwidth]: narrowBand, [frameSize]: 10 },
-  152: { [mode]: celtOnly, [bandwidth]: narrowBand, [frameSize]: 20 },
-  160: { [mode]: celtOnly, [bandwidth]: wideBand, [frameSize]: 2.5 },
-  168: { [mode]: celtOnly, [bandwidth]: wideBand, [frameSize]: 5 },
-  176: { [mode]: celtOnly, [bandwidth]: wideBand, [frameSize]: 10 },
-  184: { [mode]: celtOnly, [bandwidth]: wideBand, [frameSize]: 20 },
-  192: { [mode]: celtOnly, [bandwidth]: superWideBand, [frameSize]: 2.5 },
-  200: { [mode]: celtOnly, [bandwidth]: superWideBand, [frameSize]: 5 },
-  208: { [mode]: celtOnly, [bandwidth]: superWideBand, [frameSize]: 10 },
-  216: { [mode]: celtOnly, [bandwidth]: superWideBand, [frameSize]: 20 },
-  224: { [mode]: celtOnly, [bandwidth]: fullBand, [frameSize]: 2.5 },
-  232: { [mode]: celtOnly, [bandwidth]: fullBand, [frameSize]: 5 },
-  240: { [mode]: celtOnly, [bandwidth]: fullBand, [frameSize]: 10 },
-  248: { [mode]: celtOnly, [bandwidth]: fullBand, [frameSize]: 20 }
-};
-var OpusHeader = class _OpusHeader extends CodecHeader {
-  static [getHeaderFromUint8Array](dataValue, packetData, headerCache) {
-    const header3 = {};
-    header3[channels] = dataValue[9];
-    header3[channelMappingFamily] = dataValue[18];
-    header3[length] = header3[channelMappingFamily] !== 0 ? 21 + header3[channels] : 19;
-    if (dataValue[length] < header3[length])
-      throw new Error("Out of data while inside an Ogg Page");
-    const packetMode = packetData[0] & 3;
-    const packetLength = packetMode === 3 ? 2 : 1;
-    const key = bytesToString(dataValue[subarray](0, header3[length])) + bytesToString(packetData[subarray](0, packetLength));
-    const cachedHeader = headerCache[getHeader](key);
-    if (cachedHeader) return new _OpusHeader(cachedHeader);
-    if (key.substr(0, 8) !== "OpusHead") {
-      return null;
-    }
-    if (dataValue[8] !== 1) return null;
-    header3[data] = uint8Array.from(dataValue[subarray](0, header3[length]));
-    const view = new dataView(header3[data][buffer]);
-    header3[bitDepth] = 16;
-    header3[preSkip] = view.getUint16(10, true);
-    header3[inputSampleRate] = view.getUint32(12, true);
-    header3[sampleRate] = rate48000;
-    header3[outputGain] = view.getInt16(16, true);
-    if (header3[channelMappingFamily] in channelMappingFamilies) {
-      header3[channelMode] = channelMappingFamilies[header3[channelMappingFamily]][header3[channels] - 1];
-      if (!header3[channelMode]) return null;
-    }
-    if (header3[channelMappingFamily] !== 0) {
-      header3[streamCount] = dataValue[19];
-      header3[coupledStreamCount] = dataValue[20];
-      header3[channelMappingTable] = [
-        ...dataValue[subarray](21, header3[channels] + 21)
-      ];
-    }
-    const packetConfig = configTable[248 & packetData[0]];
-    header3[mode] = packetConfig[mode];
-    header3[bandwidth] = packetConfig[bandwidth];
-    header3[frameSize] = packetConfig[frameSize];
-    switch (packetMode) {
-      case 0:
-        header3[frameCount] = 1;
-        break;
-      case 1:
-      // 1: 2 frames in the packet, each with equal compressed size
-      case 2:
-        header3[frameCount] = 2;
-        break;
-      case 3:
-        header3[isVbr] = !!(128 & packetData[1]);
-        header3[hasOpusPadding] = !!(64 & packetData[1]);
-        header3[frameCount] = 63 & packetData[1];
-        break;
-      default:
-        return null;
-    }
-    {
-      const {
-        length: length2,
-        data: headerData,
-        channelMappingFamily: channelMappingFamily2,
-        ...codecUpdateFields
-      } = header3;
-      headerCache[setHeader](key, header3, codecUpdateFields);
-    }
-    return new _OpusHeader(header3);
-  }
-  /**
-   * @private
-   * Call OpusHeader.getHeader(Array<Uint8>) to get instance
-   */
-  constructor(header3) {
-    super(header3);
-    this[data] = header3[data];
-    this[bandwidth] = header3[bandwidth];
-    this[channelMappingFamily] = header3[channelMappingFamily];
-    this[channelMappingTable] = header3[channelMappingTable];
-    this[coupledStreamCount] = header3[coupledStreamCount];
-    this[frameCount] = header3[frameCount];
-    this[frameSize] = header3[frameSize];
-    this[hasOpusPadding] = header3[hasOpusPadding];
-    this[inputSampleRate] = header3[inputSampleRate];
-    this[isVbr] = header3[isVbr];
-    this[mode] = header3[mode];
-    this[outputGain] = header3[outputGain];
-    this[preSkip] = header3[preSkip];
-    this[streamCount] = header3[streamCount];
-  }
-};
-
-// ../../node_modules/codec-parser/src/codecs/opus/OpusParser.js
-var OpusParser = class extends Parser {
-  constructor(codecParser, headerCache, onCodec) {
-    super(codecParser, headerCache);
-    this.Frame = OpusFrame;
-    this.Header = OpusHeader;
-    onCodec(this[codec]);
-    this._identificationHeader = null;
-    this._preSkipRemaining = null;
-  }
-  get [codec]() {
-    return "opus";
-  }
-  /**
-   * @todo implement continued page support
-   */
-  [parseOggPage](oggPage) {
-    if (oggPage[pageSequenceNumber] === 0) {
-      this._headerCache[enable]();
-      this._identificationHeader = oggPage[data];
-    } else if (oggPage[pageSequenceNumber] === 1) {
-    } else {
-      oggPage[codecFrames] = frameStore.get(oggPage)[segments].map((segment) => {
-        const header3 = OpusHeader[getHeaderFromUint8Array](
-          this._identificationHeader,
-          segment,
-          this._headerCache
-        );
-        if (header3) {
-          if (this._preSkipRemaining === null)
-            this._preSkipRemaining = header3[preSkip];
-          let samples2 = header3[frameSize] * header3[frameCount] / 1e3 * header3[sampleRate];
-          if (this._preSkipRemaining > 0) {
-            this._preSkipRemaining -= samples2;
-            samples2 = this._preSkipRemaining < 0 ? -this._preSkipRemaining : 0;
-          }
-          return new OpusFrame(segment, header3, samples2);
-        }
-        this._codecParser[logError2](
-          "Failed to parse Ogg Opus Header",
-          "Not a valid Ogg Opus file"
-        );
-      });
-    }
-    return oggPage;
-  }
-};
-
-// ../../node_modules/codec-parser/src/codecs/vorbis/VorbisFrame.js
-var VorbisFrame = class extends CodecFrame {
-  constructor(data3, header3, samples2) {
-    super(header3, data3, samples2);
-  }
-};
-
-// ../../node_modules/codec-parser/src/codecs/vorbis/VorbisHeader.js
-var blockSizes = {
-  // 0b0110: 64,
-  // 0b0111: 128,
-  // 0b1000: 256,
-  // 0b1001: 512,
-  // 0b1010: 1024,
-  // 0b1011: 2048,
-  // 0b1100: 4096,
-  // 0b1101: 8192
-};
-for (let i = 0; i < 8; i++) blockSizes[i + 6] = 2 ** (6 + i);
-var VorbisHeader = class _VorbisHeader extends CodecHeader {
-  static [getHeaderFromUint8Array](dataValue, headerCache, vorbisCommentsData, vorbisSetupData) {
-    if (dataValue[length] < 30)
-      throw new Error("Out of data while inside an Ogg Page");
-    const key = bytesToString(dataValue[subarray](0, 30));
-    const cachedHeader = headerCache[getHeader](key);
-    if (cachedHeader) return new _VorbisHeader(cachedHeader);
-    const header3 = { [length]: 30 };
-    if (key.substr(0, 7) !== "vorbis") {
-      return null;
-    }
-    header3[data] = uint8Array.from(dataValue[subarray](0, 30));
-    const view = new dataView(header3[data][buffer]);
-    header3[version] = view.getUint32(7, true);
-    if (header3[version] !== 0) return null;
-    header3[channels] = dataValue[11];
-    header3[channelMode] = vorbisOpusChannelMapping[header3[channels] - 1] || "application defined";
-    header3[sampleRate] = view.getUint32(12, true);
-    header3[bitrateMaximum] = view.getInt32(16, true);
-    header3[bitrateNominal] = view.getInt32(20, true);
-    header3[bitrateMinimum] = view.getInt32(24, true);
-    header3[blocksize1] = blockSizes[(dataValue[28] & 240) >> 4];
-    header3[blocksize0] = blockSizes[dataValue[28] & 15];
-    if (header3[blocksize0] > header3[blocksize1]) return null;
-    if (dataValue[29] !== 1) return null;
-    header3[bitDepth] = 32;
-    header3[vorbisSetup] = vorbisSetupData;
-    header3[vorbisComments] = vorbisCommentsData;
-    {
-      const {
-        length: length2,
-        data: data3,
-        version: version2,
-        vorbisSetup: vorbisSetup3,
-        vorbisComments: vorbisComments3,
-        ...codecUpdateFields
-      } = header3;
-      headerCache[setHeader](key, header3, codecUpdateFields);
-    }
-    return new _VorbisHeader(header3);
-  }
-  /**
-   * @private
-   * Call VorbisHeader.getHeader(Array<Uint8>) to get instance
-   */
-  constructor(header3) {
-    super(header3);
-    this[bitrateMaximum] = header3[bitrateMaximum];
-    this[bitrateMinimum] = header3[bitrateMinimum];
-    this[bitrateNominal] = header3[bitrateNominal];
-    this[blocksize0] = header3[blocksize0];
-    this[blocksize1] = header3[blocksize1];
-    this[data] = header3[data];
-    this[vorbisComments] = header3[vorbisComments];
-    this[vorbisSetup] = header3[vorbisSetup];
-  }
-};
-
-// ../../node_modules/codec-parser/src/codecs/vorbis/VorbisParser.js
-var VorbisParser = class extends Parser {
-  constructor(codecParser, headerCache, onCodec) {
-    super(codecParser, headerCache);
-    this.Frame = VorbisFrame;
-    onCodec(this[codec]);
-    this._identificationHeader = null;
-    this._setupComplete = false;
-    this._prevBlockSize = null;
-  }
-  get [codec]() {
-    return vorbis;
-  }
-  [parseOggPage](oggPage) {
-    oggPage[codecFrames] = [];
-    for (const oggPageSegment of frameStore.get(oggPage)[segments]) {
-      if (oggPageSegment[0] === 1) {
-        this._headerCache[enable]();
-        this._identificationHeader = oggPage[data];
-        this._setupComplete = false;
-      } else if (oggPageSegment[0] === 3) {
-        this._vorbisComments = oggPageSegment;
-      } else if (oggPageSegment[0] === 5) {
-        this._vorbisSetup = oggPageSegment;
-        this._mode = this._parseSetupHeader(oggPageSegment);
-        this._setupComplete = true;
-      } else if (this._setupComplete) {
-        const header3 = VorbisHeader[getHeaderFromUint8Array](
-          this._identificationHeader,
-          this._headerCache,
-          this._vorbisComments,
-          this._vorbisSetup
-        );
-        if (header3) {
-          oggPage[codecFrames].push(
-            new VorbisFrame(
-              oggPageSegment,
-              header3,
-              this._getSamples(oggPageSegment, header3)
-            )
-          );
-        } else {
-          this._codecParser[logError](
-            "Failed to parse Ogg Vorbis Header",
-            "Not a valid Ogg Vorbis file"
-          );
-        }
-      }
-    }
-    return oggPage;
-  }
-  _getSamples(segment, header3) {
-    const blockFlag = this._mode.blockFlags[segment[0] >> 1 & this._mode.mask];
-    const currentBlockSize = blockFlag ? header3[blocksize1] : header3[blocksize0];
-    const samplesValue = this._prevBlockSize === null ? 0 : (this._prevBlockSize + currentBlockSize) / 4;
-    this._prevBlockSize = currentBlockSize;
-    return samplesValue;
-  }
-  // https://gitlab.xiph.org/xiph/liboggz/-/blob/master/src/liboggz/oggz_auto.c#L911
-  // https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/vorbis_parser.c
-  /*
-   * This is the format of the mode data at the end of the packet for all
-   * Vorbis Version 1 :
-   *
-   * [ 6:number_of_modes ]
-   * [ 1:size | 16:window_type(0) | 16:transform_type(0) | 8:mapping ]
-   * [ 1:size | 16:window_type(0) | 16:transform_type(0) | 8:mapping ]
-   * [ 1:size | 16:window_type(0) | 16:transform_type(0) | 8:mapping ]
-   * [ 1:framing(1) ]
-   *
-   * e.g.:
-   *
-   * MsB         LsB
-   *              <-
-   * 0 0 0 0 0 1 0 0
-   * 0 0 1 0 0 0 0 0
-   * 0 0 1 0 0 0 0 0
-   * 0 0 1|0 0 0 0 0
-   * 0 0 0 0|0|0 0 0
-   * 0 0 0 0 0 0 0 0
-   * 0 0 0 0|0 0 0 0
-   * 0 0 0 0 0 0 0 0
-   * 0 0 0 0|0 0 0 0
-   * 0 0 0|1|0 0 0 0 |
-   * 0 0 0 0 0 0 0 0 V
-   * 0 0 0|0 0 0 0 0
-   * 0 0 0 0 0 0 0 0
-   * 0 0|1 0 0 0 0 0
-   *
-   * The simplest way to approach this is to start at the end
-   * and read backwards to determine the mode configuration.
-   *
-   * liboggz and ffmpeg both use this method.
-   */
-  _parseSetupHeader(setup) {
-    const bitReader = new BitReader(setup);
-    const mode2 = {
-      count: 0,
-      blockFlags: []
-    };
-    while ((bitReader.read(1) & 1) !== 1) {
-    }
-    let modeBits;
-    while (mode2.count < 64 && bitReader.position > 0) {
-      reverse(bitReader.read(8));
-      let currentByte = 0;
-      while (bitReader.read(8) === 0 && currentByte++ < 3) {
-      }
-      if (currentByte === 4) {
-        modeBits = bitReader.read(7);
-        mode2.blockFlags.unshift(modeBits & 1);
-        bitReader.position += 6;
-        mode2.count++;
-      } else {
-        if (((reverse(modeBits) & 126) >> 1) + 1 !== mode2.count) {
-          this._codecParser[logWarning](
-            "vorbis derived mode count did not match actual mode count"
-          );
-        }
-        break;
-      }
-    }
-    mode2.mask = (1 << Math.log2(mode2.count)) - 1;
-    return mode2;
-  }
-};
-
-// ../../node_modules/codec-parser/src/containers/ogg/OggParser.js
-var OggStream = class {
-  constructor(codecParser, headerCache, onCodec) {
-    this._codecParser = codecParser;
-    this._headerCache = headerCache;
-    this._onCodec = onCodec;
-    this._continuedPacket = new uint8Array();
-    this._codec = null;
-    this._isSupported = null;
-    this._previousAbsoluteGranulePosition = null;
-  }
-  get [codec]() {
-    return this._codec || "";
-  }
-  _updateCodec(codec2, Parser2) {
-    if (this._codec !== codec2) {
-      this._headerCache[reset]();
-      this._parser = new Parser2(
-        this._codecParser,
-        this._headerCache,
-        this._onCodec
-      );
-      this._codec = codec2;
-    }
-  }
-  _checkCodecSupport({ data: data3 }) {
-    const idString = bytesToString(data3[subarray](0, 8));
-    switch (idString) {
-      case "fishead\0":
-        return false;
-      // ignore ogg skeleton packets
-      case "OpusHead":
-        this._updateCodec("opus", OpusParser);
-        return true;
-      case (/^\x7fFLAC/.test(idString) && idString):
-        this._updateCodec("flac", FLACParser);
-        return true;
-      case (/^\x01vorbis/.test(idString) && idString):
-        this._updateCodec(vorbis, VorbisParser);
-        return true;
-      default:
-        return false;
-    }
-  }
-  _checkPageSequenceNumber(oggPage) {
-    if (oggPage[pageSequenceNumber] !== this._pageSequenceNumber + 1 && this._pageSequenceNumber > 1 && oggPage[pageSequenceNumber] > 1) {
-      this._codecParser[logWarning](
-        "Unexpected gap in Ogg Page Sequence Number.",
-        `Expected: ${this._pageSequenceNumber + 1}, Got: ${oggPage[pageSequenceNumber]}`
-      );
-    }
-    this._pageSequenceNumber = oggPage[pageSequenceNumber];
-  }
-  _parsePage(oggPage) {
-    if (this._isSupported === null) {
-      this._pageSequenceNumber = oggPage[pageSequenceNumber];
-      this._isSupported = this._checkCodecSupport(oggPage);
-    }
-    this._checkPageSequenceNumber(oggPage);
-    const oggPageStore = frameStore.get(oggPage);
-    const headerData = headerStore.get(oggPageStore[header]);
-    let offset = 0;
-    oggPageStore[segments] = headerData[pageSegmentTable].map(
-      (segmentLength) => oggPage[data][subarray](offset, offset += segmentLength)
-    );
-    if (this._continuedPacket[length]) {
-      oggPageStore[segments][0] = concatBuffers(
-        this._continuedPacket,
-        oggPageStore[segments][0]
-      );
-      this._continuedPacket = new uint8Array();
-    }
-    if (headerData[pageSegmentBytes][headerData[pageSegmentBytes][length] - 1] === 255) {
-      this._continuedPacket = concatBuffers(
-        this._continuedPacket,
-        oggPageStore[segments].pop()
-      );
-    }
-    if (this._previousAbsoluteGranulePosition !== null) {
-      oggPage[samples] = Number(
-        oggPage[absoluteGranulePosition] - this._previousAbsoluteGranulePosition
-      );
-    }
-    this._previousAbsoluteGranulePosition = oggPage[absoluteGranulePosition];
-    if (this._isSupported) {
-      const frame2 = this._parser[parseOggPage](oggPage);
-      this._codecParser[mapFrameStats](frame2);
-      return frame2;
-    } else {
-      return oggPage;
-    }
-  }
-};
-var OggParser = class extends Parser {
-  constructor(codecParser, headerCache, onCodec) {
-    super(codecParser, headerCache);
-    this._onCodec = onCodec;
-    this.Frame = OggPage;
-    this.Header = OggPageHeader;
-    this._streams = /* @__PURE__ */ new Map();
-    this._currentSerialNumber = null;
-  }
-  get [codec]() {
-    const oggStream = this._streams.get(this._currentSerialNumber);
-    return oggStream ? oggStream.codec : "";
-  }
-  *[parseFrame]() {
-    const oggPage = yield* this[fixedLengthFrameSync](true);
-    this._currentSerialNumber = oggPage[streamSerialNumber];
-    let oggStream = this._streams.get(this._currentSerialNumber);
-    if (!oggStream) {
-      oggStream = new OggStream(
-        this._codecParser,
-        this._headerCache,
-        this._onCodec
-      );
-      this._streams.set(this._currentSerialNumber, oggStream);
-    }
-    if (oggPage[isLastPage]) this._streams.delete(this._currentSerialNumber);
-    return oggStream._parsePage(oggPage);
-  }
-};
-
-// ../../node_modules/codec-parser/src/CodecParser.js
-var noOp = () => {
-};
-var CodecParser = class {
-  constructor(mimeType2, {
-    onCodec,
-    onCodecHeader,
-    onCodecUpdate,
-    enableLogging = false,
-    enableFrameCRC32 = true
-  } = {}) {
-    this._inputMimeType = mimeType2;
-    this._onCodec = onCodec || noOp;
-    this._onCodecHeader = onCodecHeader || noOp;
-    this._onCodecUpdate = onCodecUpdate;
-    this._enableLogging = enableLogging;
-    this._crc32 = enableFrameCRC32 ? crc32Function : noOp;
-    this[reset]();
-  }
-  /**
-   * @public
-   * @returns The detected codec
-   */
-  get [codec]() {
-    return this._parser ? this._parser[codec] : "";
-  }
-  [reset]() {
-    this._headerCache = new HeaderCache(
-      this._onCodecHeader,
-      this._onCodecUpdate
-    );
-    this._generator = this._getGenerator();
-    this._generator.next();
-  }
-  /**
-   * @public
-   * @description Generator function that yields any buffered CodecFrames and resets the CodecParser
-   * @returns {Iterable<CodecFrame|OggPage>} Iterator that operates over the codec data.
-   * @yields {CodecFrame|OggPage} Parsed codec or ogg page data
-   */
-  *flush() {
-    this._flushing = true;
-    for (let i = this._generator.next(); i.value; i = this._generator.next()) {
-      yield i.value;
-    }
-    this._flushing = false;
-    this[reset]();
-  }
-  /**
-   * @public
-   * @description Generator function takes in a Uint8Array of data and returns a CodecFrame from the data for each iteration
-   * @param {Uint8Array} chunk Next chunk of codec data to read
-   * @returns {Iterable<CodecFrame|OggPage>} Iterator that operates over the codec data.
-   * @yields {CodecFrame|OggPage} Parsed codec or ogg page data
-   */
-  *parseChunk(chunk) {
-    for (let i = this._generator.next(chunk); i.value; i = this._generator.next()) {
-      yield i.value;
-    }
-  }
-  /**
-   * @public
-   * @description Parses an entire file and returns all of the contained frames.
-   * @param {Uint8Array} fileData Coded data to read
-   * @returns {Array<CodecFrame|OggPage>} CodecFrames
-   */
-  parseAll(fileData) {
-    return [...this.parseChunk(fileData), ...this.flush()];
-  }
-  /**
-   * @private
-   */
-  *_getGenerator() {
-    if (this._inputMimeType.match(/aac/)) {
-      this._parser = new AACParser(this, this._headerCache, this._onCodec);
-    } else if (this._inputMimeType.match(/mpeg/)) {
-      this._parser = new MPEGParser(this, this._headerCache, this._onCodec);
-    } else if (this._inputMimeType.match(/flac/)) {
-      this._parser = new FLACParser(this, this._headerCache, this._onCodec);
-    } else if (this._inputMimeType.match(/ogg/)) {
-      this._parser = new OggParser(this, this._headerCache, this._onCodec);
-    } else {
-      throw new Error(`Unsupported Codec ${mimeType}`);
-    }
-    this._frameNumber = 0;
-    this._currentReadPosition = 0;
-    this._totalBytesIn = 0;
-    this._totalBytesOut = 0;
-    this._totalSamples = 0;
-    this._sampleRate = void 0;
-    this._rawData = new Uint8Array(0);
-    while (true) {
-      const frame2 = yield* this._parser[parseFrame]();
-      if (frame2) yield frame2;
-    }
-  }
-  /**
-   * @protected
-   * @param {number} minSize Minimum bytes to have present in buffer
-   * @returns {Uint8Array} rawData
-   */
-  *[readRawData](minSize = 0, readOffset = 0) {
-    let rawData2;
-    while (this._rawData[length] <= minSize + readOffset) {
-      rawData2 = yield;
-      if (this._flushing) return this._rawData[subarray](readOffset);
-      if (rawData2) {
-        this._totalBytesIn += rawData2[length];
-        this._rawData = concatBuffers(this._rawData, rawData2);
-      }
-    }
-    return this._rawData[subarray](readOffset);
-  }
-  /**
-   * @protected
-   * @param {number} increment Bytes to increment codec data
-   */
-  [incrementRawData](increment) {
-    this._currentReadPosition += increment;
-    this._rawData = this._rawData[subarray](increment);
-  }
-  /**
-   * @protected
-   */
-  [mapCodecFrameStats](frame2) {
-    this._sampleRate = frame2[header][sampleRate];
-    frame2[header][bitrate] = frame2[duration] > 0 ? Math.round(frame2[data][length] / frame2[duration]) * 8 : 0;
-    frame2[frameNumber] = this._frameNumber++;
-    frame2[totalBytesOut] = this._totalBytesOut;
-    frame2[totalSamples] = this._totalSamples;
-    frame2[totalDuration] = this._totalSamples / this._sampleRate * 1e3;
-    frame2[crc32] = this._crc32(frame2[data]);
-    this._headerCache[checkCodecUpdate](
-      frame2[header][bitrate],
-      frame2[totalDuration]
-    );
-    this._totalBytesOut += frame2[data][length];
-    this._totalSamples += frame2[samples];
-  }
-  /**
-   * @protected
-   */
-  [mapFrameStats](frame2) {
-    if (frame2[codecFrames]) {
-      if (frame2[isLastPage]) {
-        let absoluteGranulePositionSamples = frame2[samples];
-        frame2[codecFrames].forEach((codecFrame) => {
-          const untrimmedCodecSamples = codecFrame[samples];
-          if (absoluteGranulePositionSamples < untrimmedCodecSamples) {
-            codecFrame[samples] = absoluteGranulePositionSamples > 0 ? absoluteGranulePositionSamples : 0;
-            codecFrame[duration] = codecFrame[samples] / codecFrame[header][sampleRate] * 1e3;
-          }
-          absoluteGranulePositionSamples -= untrimmedCodecSamples;
-          this[mapCodecFrameStats](codecFrame);
-        });
-      } else {
-        frame2[samples] = 0;
-        frame2[codecFrames].forEach((codecFrame) => {
-          frame2[samples] += codecFrame[samples];
-          this[mapCodecFrameStats](codecFrame);
-        });
-      }
-      frame2[duration] = frame2[samples] / this._sampleRate * 1e3 || 0;
-      frame2[totalSamples] = this._totalSamples;
-      frame2[totalDuration] = this._totalSamples / this._sampleRate * 1e3 || 0;
-      frame2[totalBytesOut] = this._totalBytesOut;
-    } else {
-      this[mapCodecFrameStats](frame2);
-    }
-  }
-  /**
-   * @private
-   */
-  _log(logger, messages) {
-    if (this._enableLogging) {
-      const stats = [
-        `${codec}:         ${this[codec]}`,
-        `inputMimeType: ${this._inputMimeType}`,
-        `readPosition:  ${this._currentReadPosition}`,
-        `totalBytesIn:  ${this._totalBytesIn}`,
-        `${totalBytesOut}: ${this._totalBytesOut}`
-      ];
-      const width = Math.max(...stats.map((s) => s[length]));
-      messages.push(
-        `--stats--${"-".repeat(width - 9)}`,
-        ...stats,
-        "-".repeat(width)
-      );
-      logger(
-        "codec-parser",
-        messages.reduce((acc, message) => acc + "\n  " + message, "")
-      );
-    }
-  }
-  /**
-   * @protected
-   */
-  [logWarning](...messages) {
-    this._log(console.warn, messages);
-  }
-  /**
-   * @protected
-   */
-  [logError2](...messages) {
-    this._log(console.error, messages);
-  }
-};
-
-// ../../node_modules/codec-parser/index.js
-var codec_parser_default = CodecParser;
-var codecFrames2 = codecFrames;
-var data2 = data;
-var header2 = header;
-var isLastPage2 = isLastPage;
-var vorbisSetup2 = vorbisSetup;
-var totalSamples2 = totalSamples;
-
-// ../../node_modules/@wasm-audio-decoders/ogg-vorbis/src/EmscriptenWasm.js
-function EmscriptenWASM2(WASMAudioDecoderCommon2) {
-  var Module = Module;
-  function ready() {
-  }
-  Module = {};
-  function abort(what) {
-    throw what;
-  }
-  var HEAP8, HEAP16, HEAP32, HEAPU8, HEAPU16, HEAPU32, HEAPF32, HEAPF64, HEAP64, HEAPU64, wasmMemory;
-  function updateMemoryViews() {
-    var b = wasmMemory.buffer;
-    HEAP8 = new Int8Array(b);
-    HEAP16 = new Int16Array(b);
-    HEAPU8 = new Uint8Array(b);
-    HEAPU16 = new Uint16Array(b);
-    HEAP32 = new Int32Array(b);
-    HEAPU32 = new Uint32Array(b);
-    HEAPF32 = new Float32Array(b);
-    HEAPF64 = new Float64Array(b);
-    HEAP64 = new BigInt64Array(b);
-    HEAPU64 = new BigUint64Array(b);
-  }
-  var base64Decode = (b64) => {
-    var b1, b2, i2 = 0, j = 0, bLength = b64.length;
-    var output = new Uint8Array((bLength * 3 >> 2) - (b64[bLength - 2] == "=") - (b64[bLength - 1] == "="));
-    for (; i2 < bLength; i2 += 4, j += 3) {
-      b1 = base64ReverseLookup[b64.charCodeAt(i2 + 1)];
-      b2 = base64ReverseLookup[b64.charCodeAt(i2 + 2)];
-      output[j] = base64ReverseLookup[b64.charCodeAt(i2)] << 2 | b1 >> 4;
-      output[j + 1] = b1 << 4 | b2 >> 2;
-      output[j + 2] = b2 << 6 | base64ReverseLookup[b64.charCodeAt(i2 + 3)];
-    }
-    return output;
-  };
-  var __abort_js = () => abort("");
-  var __emscripten_runtime_keepalive_clear = () => {
-  };
-  var timers = {};
-  var callUserCallback = (func) => func();
-  var _emscripten_get_now = () => performance.now();
-  var __setitimer_js = (which, timeout_ms) => {
-    if (timers[which]) {
-      clearTimeout(timers[which].id);
-      delete timers[which];
-    }
-    if (!timeout_ms) return 0;
-    var id = setTimeout(() => {
-      delete timers[which];
-      callUserCallback(() => __emscripten_timeout(which, _emscripten_get_now()));
-    }, timeout_ms);
-    timers[which] = {
-      id,
-      timeout_ms
-    };
-    return 0;
-  };
-  var _emscripten_math_atan = Math.atan;
-  var _emscripten_math_cos = Math.cos;
-  var _emscripten_math_exp = Math.exp;
-  var _emscripten_math_log = Math.log;
-  var _emscripten_math_pow = Math.pow;
-  var _emscripten_math_sin = Math.sin;
-  var _emscripten_resize_heap = (requestedSize) => {
-    var oldSize = HEAPU8.length;
-    requestedSize >>>= 0;
-    return false;
-  };
-  var _proc_exit = (code) => {
-    throw `exit(${code})`;
-  };
-  for (var base64ReverseLookup = new Uint8Array(123), i = 25; i >= 0; --i) {
-    base64ReverseLookup[48 + i] = 52 + i;
-    base64ReverseLookup[65 + i] = i;
-    base64ReverseLookup[97 + i] = 26 + i;
-  }
-  base64ReverseLookup[43] = 62;
-  base64ReverseLookup[47] = 63;
-  var wasmImports = {
-    /** @export */
-    "e": __abort_js,
-    /** @export */
-    "d": __emscripten_runtime_keepalive_clear,
-    /** @export */
-    "f": __setitimer_js,
-    /** @export */
-    "b": _emscripten_math_atan,
-    /** @export */
-    "a": _emscripten_math_cos,
-    /** @export */
-    "i": _emscripten_math_exp,
-    /** @export */
-    "h": _emscripten_math_log,
-    /** @export */
-    "g": _emscripten_math_pow,
-    /** @export */
-    "c": _emscripten_math_sin,
-    /** @export */
-    "k": _emscripten_resize_heap,
-    /** @export */
-    "j": _proc_exit
-  };
-  function assignWasmExports(wasmExports) {
-    _create_decoder = wasmExports["n"];
-    _malloc = wasmExports["o"];
-    _send_setup = wasmExports["p"];
-    _init_dsp = wasmExports["q"];
-    _decode_packets = wasmExports["r"];
-    _destroy_decoder = wasmExports["s"];
-    _free = wasmExports["t"];
-    __emscripten_timeout = wasmExports["v"];
-  }
-  var _create_decoder, _malloc, _send_setup, _init_dsp, _decode_packets, _destroy_decoder, _free, __emscripten_timeout;
-  function initRuntime(wasmExports) {
-    wasmExports["m"]();
-  }
-  if (!EmscriptenWASM2.wasm) Object.defineProperty(EmscriptenWASM2, "wasm", { get: () => String.raw`dynEncode012091253f87dì%nä= 4& ¿nÝØäÂLÚªã9ÚØ[äº\ ¼¡³R=}L]Èÿ2 ÿù¶J1jj¡é,zäV|i¸Qk¹= 
+var si=new Map([[-1,"OPUS_BAD_ARG"],[-2,"OPUS_BUFFER_TOO_SMALL"],[-3,"OPUS_INTERNAL_ERROR"],[-4,"OPUS_INVALID_PACKET"],[-5,"OPUS_UNIMPLEMENTED"],[-6,"OPUS_INVALID_STATE"],[-7,"OPUS_ALLOC_FAIL"]]),ut;async function Ss(){if(ut)return ut;let t=import("./src/opus.wasm.js").then(e=>e.default());ut=t;try{return await t}catch(e){throw ut=null,e}}async function ni(){return new Xt(await Ss())}var Xt=class{constructor(e){this.module=e,this.handle=0,this.input=0,this.capacity=0,this.channels=0,this.sampleRate=0,this.frameNumber=0,this.inputBytes=0,this.outputSamples=0,this.freed=!1}configure(e){if(this.freed)throw Error("Decoder already freed");let i=e.sampleRate??48e3,n=e.channels;if(![8e3,12e3,16e3,24e3,48e3].includes(i))throw RangeError("Invalid Opus sample rate");if(!Number.isInteger(n)||n<1||n>255)throw RangeError("Invalid Opus channel count");let r=e.streamCount??1,s=e.coupledStreamCount??(n===2?1:0);if(!Number.isInteger(r)||r<1||r>255||!Number.isInteger(s)||s<0||s>r||r+s>255)throw RangeError("Invalid Opus stream layout");let a=e.channelMappingTable??(n===1?[0]:n===2?[0,1]:null);if(!a||a.length!==n)throw Error("Invalid Opus channel mapping");a=Array.from(a);let o=r+s;if(a.some(c=>!Number.isInteger(c)||c<0||c>255||c>=o&&c!==255))throw Error("Invalid Opus channel mapping");let h=e.preSkip??0,l=e.outputGain??0;if(!Number.isSafeInteger(h)||h<0||h>2147483647)throw RangeError("Invalid Opus pre-skip");if(!Number.isInteger(l)||l<-32768||l>32767)throw RangeError("Invalid Opus output gain");this.unconfigure();let d=this.module._malloc(n);if(!d)throw Error("Unable to allocate Opus channel mapping");try{this.module.HEAPU8.set(a,d),this.handle=this.module._audio_opus_create(i,n,r,s,d,h,l)}finally{this.module._free(d)}if(!this.handle){let c=this.module._audio_opus_last_error();throw Error("libopus "+c+" "+(si.get(c)||"UNKNOWN_ERROR"))}this.channels=n,this.sampleRate=i,this.frameNumber=0,this.inputBytes=0,this.outputSamples=0}decodeFrames(e){if(this.freed)throw Error("Decoder already freed");if(!this.handle)throw Error("Opus decoder is not configured");let i=[],n=[],r=0;for(let a of e){if(!(a instanceof Uint8Array))throw TypeError("Opus packet must be a Uint8Array");if(a.length>this.capacity){let h=this.module._malloc(a.length);if(!h)throw Error("Unable to allocate Opus input buffer");this.input&&this.module._free(this.input),this.input=h,this.capacity=a.length}a.length&&this.module.HEAPU8.set(a,this.input);let o=this.module._audio_opus_decode(this.handle,this.input,a.length);if(o<0)n.push({message:"libopus "+o+" "+(si.get(o)||"UNKNOWN_ERROR"),frameLength:a.length,frameNumber:this.frameNumber,inputBytes:this.inputBytes,outputSamples:this.outputSamples});else if(o){let h=this.module._audio_opus_output(this.handle)>>2;i.push(Array.from({length:this.channels},(l,d)=>this.module.HEAPF32.slice(h+d*o,h+(d+1)*o))),r+=o,this.outputSamples+=o}this.frameNumber++,this.inputBytes+=a.length}let s=r?Array.from({length:this.channels},(a,o)=>{let h=new Float32Array(r),l=0;for(let d of i)h.set(d[o],l),l+=d[o].length;return h}):[];return{errors:n,channelData:s,samplesDecoded:r,sampleRate:this.sampleRate,bitDepth:32}}unconfigure(){this.handle&&(this.module._audio_opus_destroy(this.handle),this.handle=0,this.channels=0,this.sampleRate=0)}free(){this.freed||(this.unconfigure(),this.input&&this.module._free(this.input),this.input=0,this.capacity=0,this.freed=!0)}};var bs=(t,e=4294967295,i=79764919)=>{let n=new Int32Array(256),r,s,a,o=e;for(r=0;r<256;r++){for(a=r<<24,s=8;s>0;--s)a=2147483648&a?a<<1^i:a<<1;n[r]=a}for(r=0;r<t.length;r++)o=o<<8^n[255&(o>>24^t[r])];return o},ai=(t,e=bs)=>{let i=m=>new Uint8Array(m.length/2).map(((P,q)=>parseInt(m.substring(2*q,2*(q+1)),16))),n=m=>i(m)[0],r=new Map;[,8364,,8218,402,8222,8230,8224,8225,710,8240,352,8249,338,,381,,,8216,8217,8220,8221,8226,8211,8212,732,8482,353,8250,339,,382,376].forEach(((m,P)=>r.set(m,P)));let s=new Uint8Array(t.length),a,o,h,l=!1,d=0,c=42,f=t.length>13&&t.substring(0,9)==="dynEncode",w=0;f&&(w=11,o=n(t.substring(9,w)),o<=1&&(w+=2,c=n(t.substring(11,w))),o===1&&(w+=8,h=(m=>new DataView(i(m).buffer).getInt32(0,!0))(t.substring(13,w))));let b=256-c;for(let m=w;m<t.length;m++)if(a=t.charCodeAt(m),a!==61||l){if(a===92&&m<t.length-5&&f){let P=t.charCodeAt(m+1);P!==117&&P!==85||(a=parseInt(t.substring(m+2,m+6),16),m+=5)}if(a>255){let P=r.get(a);P&&(a=P+127)}l&&(l=!1,a-=64),s[d++]=a<c&&a>0?a+b:a-c}else l=!0;let g=s.subarray(0,d);if(f&&o===1){let m=e(g);if(m!==h){let P="Decode failed crc32 validation";throw console.error("`simple-yenc`\n",P+`
+`,"Expected: "+h+"; Got: "+m+`
+`,"Visit https://github.com/eshaz/simple-yenc for more information"),Error(P)}}return g};function O(){let t=Uint8Array,e=Float32Array;O.modules||Object.defineProperties(O,{modules:{value:new WeakMap},setModule:{value(i,n){O.modules.set(i,Promise.resolve(n))}},getModule:{value(i,n){let r=O.modules.get(i);return r||(n?r=WebAssembly.compile(ai(n)):(n=i.wasm,r=O.inflateDynEncodeString(n).then(s=>WebAssembly.compile(s))),O.modules.set(i,r)),r}},concatFloat32:{value(i,n){let r=new e(n),s=0,a=0;for(;s<i.length;)r.set(i[s],a),a+=i[s++].length;return r}},getDecodedAudio:{value:(i,n,r,s,a)=>({errors:i,channelData:n,samplesDecoded:r,sampleRate:s,bitDepth:a})},getDecodedAudioMultiChannel:{value(i,n,r,s,a,o){let h=[],l,d;for(l=0;l<r;l++){let c=[];for(d=0;d<n.length;)c.push(n[d++][l]||[]);h.push(O.concatFloat32(c,s))}return O.getDecodedAudio(i,h,s,a,o)}},inflateDynEncodeString:{value(i){return i=ai(i),new Promise(n=>{let r=String.raw`dynEncode012804c7886d()((()>+*§§)§,§§§§)§+§§§)§+.-()(*)-+)(.7*§)i¸¸,3§(i¸¸,3/G+.¡*(,(,3+)2å:-),§H(P*DI*H(P*@I++hH)H*r,hH(H(P*<J,i)^*<H,H(P*4U((I-H(H*i0J,^*DH+H-H*I+H,I*4)33H(H*H)^*DH(H+H)^*@H+i§H)i§3æ*).§K(iHI/+§H,iHn,§H+i(H+i(rCJ0I,H*I-+hH,,hH(H-V)(i)J.H.W)(i)c)(H,i)I,H-i*I-4)33i(I.*hH(V)(H+n5(H(i*I-i(I,i)I.+hH,i*J+iHn,hi(I-i*I,+hH,H/H-c)(H,iFn,hi(I,+hH,H0n5-H*V)(J(,hH/H(i)J(H(V)(J(i)c)(H)H(i)H,c)(3H*i*I*H,i)I,4(3(-H(H,W)(H-I-H,i*I,4)3(3(3H,H-I1H+I,H.i)H1V)(J.i(v5(33H.-H(H,i(c)(H,i*I,4)333)-§i*I*+§H*iHn,hi73H,H(i)8(H+J+H)P*(H*V)(J-r,§H)P*,H.i)H+H,i)V)(-H*i*I*H+i)I+H-H.I.H,H-i)I,4)333Ã+)-§iø7i(^*(iü7I,*h+hH+iDn,h*hilI+i)I,+hH+,hH+iô7H,c)(i)H+i´8W)(H,I,H+i*I+4)-+hH(H)8*J-i(p5.*h*h*hH-i')u,hH(P*(J+,hH(P*0J,H(P*,n50H+H,H-b((3H(P*0i)I.4)3H-i¨*n5*H-iÅ*s,hi73H-i)J+V)&+I,H(H+V)æ,8(I.H(H*8*J-i(p51H-i)J+i¸7V)(H(H+iø7V)(8(J/H(P*0J+s,hi73H+H,H.J,I.H(P*(m5(H.H(P*,s5.+hH,m5*H(P*(J.H+H.H+H/U((b((H(H(P*0i)J+^*0H,i)I,4(3(3H(H.^*03H-i¨*o5)33i(73(3(3-H,H+i)c)(H,i*I,H+i)I+4)33i)I-3H-3!2)0§K(i2J,L(H,H(^*(H,H*^*4H,i(^*0H,i(^*DH,j(_*<H,H)P*(^*,H,H+P*(^*8*h*h+hH,i)8(I3i§I**h*h*h*h*h*h*hH,i*8(6+(),03H,j(_*@i*I-H,P*<J.i,J(H,P*8J/s50H,H.i+J0^*<i¦I*H.H,P*4J1J.U(*H.U((J2i')o5/H.U()I.H,H(^*<H0H1U((H.i0J.i§i0i')o5/H/H.H2J*H(J.q50H,P*0J/H*I-H,P*(J0,hH,P*,H-q,hi)I-423+hH*m5+H/H0H(H1U((b((H/i)I/H(i)I(H*i)I*4(3(3H,H.^*<H,H-^*04*3iØ1U((5+i(I(i¨7i1^*(i$6iè1^*(i°7iè6^*(i¬7iÈ6^*(+hH(iÈ*n,hiÈ*I(+hH(i¨,n,hi¨,I(+hH(iØ,n,hiØ,I(+hH(iè,o,hH,i-H(i0c)(H(i*I(4)33iè1i1H,i-iÈ*8)Bi(I(+hH(ido,hH,i-H(i-c)(H(i*I(4)33iÈ6iè6H,i-iF8)BiØ1i)b((41-H,i-H(i/c)(H(i*I(4)3(3(-H,i-H(i1c)(H(i*I(4)3(3(-H,i-H(i0c)(H(i*I(4)3(3(3H,H/^*0H,H(^*<3i(I*4*3H,H,i¸)^*TH,H,iø-^*PH,H,iX^*LH,H,i(^*HH,i-8(I(H,i-8(I-i¥I*H,i,8(I.H(iErH-iEr5)H(i©*I1H-i)I0i(i;H.i,J(i(H(i(rCJ(J*H*i;sCI*i¨1I-H(I/+hH/,hH,i-H-V)(i)H,i+8(c)(H/i)I/H-i*I-H*i)I*4)-H(i)i¨1I/+hH(H*o,hH,i-H/V)(i)i(c)(H/i*I/H(i)I(4)33i¤I*H,iø-H,i¸)H,i-i;8)5+H0H1I2i(I-+hH-H2p,hH,H,iP8*J*i(p5-H*i7u,hH,i-H-i)H*c)(H-i)I-4*3i(I/i+I.i+I(*h*h*hH*i86*(*)3H-m,hi£I*403H-i)H,W)-I/i*I(4)3i3I.i/I(3H2H,H(8(H.J(H-J.p,hi¢I*4.3H,i-H-i)I*+hH(,hH*H/c)(H*i*I*H(i)I(4)-H.I-4+3(3(33H,W)1m,hiI*4,3H,iø-H,i¸)H,i-H18)J(,hi¡I*H(i(p5,H1H,V)ú-H,V)ø-o5,3H,i(H,iXH,i-H1i)H08)J(,hi I*H(i(p5,H0H,V)H,V)o5,3H,H,iPH,iH8+I*4+3(3(3H,i$6i¬78+I*3H*H3m5(3i)I-H*i(r5)3H)H,P*0^*(H+H,P*<^*(H*I-3H,i2L(H-33Á)+(i¨03b+(,(-(.(/(0(1(2(3(5(7(9(;(?(C(G(K(S([(c(k({(((«(Ë(ë((*)(iø03O)()()()(*(*(*(*(+(+(+(+(,(,(,(,(-(-(-(-(i¨13M8(9(:(((0(/(1(.(2(-(3(,(4(+(5(*(6()(7(T7*S7US0U `;O.getModule(O,r).then(s=>WebAssembly.instantiate(s,{})).then(({exports:s})=>{let a=new Map(Object.entries(s)),o=a.get("puff"),h=a.get("memory").buffer,l=new t(h),d=new DataView(h),c=a.get("__heap_base"),f=i.length,w=c;c+=4,d.setInt32(w,f,!0);let b=c;c+=f,l.set(i,b);let g=c;c+=4,d.setInt32(g,l.byteLength-c,!0),o(c,g,b,w),n(l.slice(c,c+d.getInt32(g,!0)))})})}}}),Object.defineProperty(this,"wasm",{enumerable:!0,get:()=>this._wasm}),this.getOutputChannels=(i,n,r)=>{let s=[],a=0;for(;a<n;)s.push(i.slice(a*r,a++*r+r));return s},this.allocateTypedArray=(i,n,r=!0)=>{let s=this._wasm.malloc(n.BYTES_PER_ELEMENT*i);return r&&this._pointers.add(s),{ptr:s,len:i,buf:new n(this._wasm.HEAP,s,i)}},this.free=()=>{this._pointers.forEach(i=>{this._wasm.free(i)}),this._pointers.clear()},this.codeToString=i=>{let n=[],r=new Uint8Array(this._wasm.HEAP);for(let s=r[i];s!==0;s=r[++i])n.push(s);return String.fromCharCode.apply(null,n)},this.addError=(i,n,r,s,a,o)=>{i.push({message:n,frameLength:r,frameNumber:s,inputBytes:a,outputSamples:o})},this.instantiate=(i,n)=>(n&&O.setModule(i,n),this._wasm=new i(O).instantiate(),this._pointers=new Set,this._wasm.ready.then(()=>this))}var Ms=null,ws=()=>globalThis.Worker||Ms,Is=class extends ws(){constructor(t,e,i,n){O.modules||new O;let r=O.modules.get(i);if(!r){let s="text/javascript",a,o=`'use strict';(${((h,l,d)=>{let c,f,w=new Promise(b=>{f=b});self.onmessage=({data:{id:b,command:g,data:m}})=>{let P=w,q={id:b},$;g==="init"?(Object.defineProperties(h,{WASMAudioDecoderCommon:{value:l},EmscriptenWASM:{value:d},module:{value:m.module},isWebWorker:{value:!0}}),c=new h(m.options),f()):g==="free"?c.free():g==="ready"?P=P.then(()=>c.ready):g==="reset"?P=P.then(()=>c.reset()):(Object.assign(q,c[g](Array.isArray(m)?m.map(Qe=>new Uint8Array(Qe)):new Uint8Array(m))),$=q.channelData?q.channelData.map(Qe=>Qe.buffer):[]),P.then(()=>self.postMessage(q,$))}}).toString()})(${i}, ${O}, ${n})`;try{a=typeof process.versions.node<"u"}catch{}r=a?`data:${s};base64,${Buffer.from(o).toString("base64")}`:URL.createObjectURL(new Blob([o],{type:s})),O.modules.set(i,r)}super(r,{name:e}),this._id=Number.MIN_SAFE_INTEGER,this._enqueuedOperations=new Map,this.onmessage=({data:s})=>{let{id:a,...o}=s;this._enqueuedOperations.get(a)(o),this._enqueuedOperations.delete(a)},new n(O).getModule().then(s=>{this.postToDecoder("init",{module:s,options:t})})}async postToDecoder(t,e){return new Promise(i=>{this.postMessage({command:t,id:this._id,data:e}),this._enqueuedOperations.set(this._id++,i)})}get ready(){return this.postToDecoder("ready")}async free(){await this.postToDecoder("free").finally(()=>{this.terminate()})}async reset(){await this.postToDecoder("reset")}},vi=(t,e)=>{Object.defineProperty(t,"name",{value:e})},C=Symbol,Hi=", ",_=(()=>{let t="front",e="side",i="rear",n="left",r="center",s="right";return["",t+" ",e+" ",i+" "].map(a=>[[n,s],[n,s,r],[n,r,s],[r,n,s],[r]].flatMap(o=>o.map(h=>a+h).join(Hi)))})(),ne="LFE",tt="monophonic (mono)",Pe="stereo",qe="surround",R=(t,...e)=>`${[tt,Pe,`linear ${qe}`,"quadraphonic",`5.0 ${qe}`,`5.1 ${qe}`,`6.1 ${qe}`,`7.1 ${qe}`][t-1]} (${e.join(Hi)})`,wr=[tt,R(2,_[0][0]),R(3,_[0][2]),R(4,_[1][0],_[3][0]),R(5,_[1][2],_[3][0]),R(6,_[1][2],_[3][0],ne),R(7,_[1][2],_[2][0],_[3][4],ne),R(8,_[1][2],_[2][0],_[3][0],ne)],Cs=192e3,Fs=176400,yi=96e3,Si=88200,As=64e3,Bt=48e3,Ur=44100,Lr=32e3,Or=24e3,Rr=22050,xr=16e3,bi=12e3,Mi=11025,kr=8e3,Ps=7350,ge="absoluteGranulePosition",M="bandwidth",le="bitDepth",W="bitrate",Jt=W+"Maximum",jt=W+"Minimum",Yt=W+"Nominal",rt="buffer",$t=rt+"Fullness",x="codec",j=x+"Frames",Zt="coupledStreamCount",Ot="crc",wi=Ot+"16",Ii=Ot+"32",k="data",v="description",Ce="duration",dt="emphasis",er="hasOpusPadding",se="header",je="isContinuedPacket",tr="isCopyrighted",Ye="isFirstPage",rr="isHome",ae="isLastPage",De="isOriginal",Ee="isPrivate",ir="isVbr",K="layer",u="length",H="mode",me=H+"Extension",Ci="mpeg",Ue=Ci+"Version",sr="numberAACFrames",nr="outputGain",Ft="preSkip",ar="profile",or=C(),Le="protection",Ds="rawData",_e="segments",A="subarray",$e="version",Nt="vorbis",lr=Nt+"Comments",At=Nt+"Setup",Tt="block",cr=Tt+"ingStrategy",hr=C(),de=Tt+"Size",ze=Tt+"size0",Xe=Tt+"size1",pt=C(),Vt="channel",pe=Vt+"MappingFamily",ur=Vt+"MappingTable",ce=Vt+"Mode",ft=C(),S=Vt+"s",Fi="copyright",dr=Fi+"Id",pr=Fi+"IdStart",He="frame",Ie=He+"Count",he=He+"Length",Qt="Number",Ze=He+Qt,re=He+"Padding",y=He+"Size",Ai="Rate",fr="inputSample"+Ai,Br="page",Pt=Br+"Checksum",Rt=C(),Je=Br+"SegmentTable",T=Br+"Sequence"+Qt,Nr="sample",mr=Nr+Qt,U=Nr+Ai,ie=C(),F=Nr+"s",Gt="stream",_r=Gt+"Count",Pi=Gt+"Info",Oe=Gt+"Serial"+Qt,Es=Gt+"StructureVersion",Tr="total",Dt=Tr+"BytesOut",Et=Tr+"Duration",xt=Tr+"Samples",L=C(),oe=C(),mt=C(),qt=C(),ke=C(),Di=C(),oi=C(),Wt=C(),N=C(),Ne=C(),ye=C(),it=C(),Kt=C(),Ei=C(),ve=C(),Be=C(),Te=C(),Ui=C(),Y=Uint8Array,zt=DataView,I="reserved",G="bad",We="free",Vr="none",Li="16bit CRC",Qr=(t,e,i)=>{for(let n=0;n<t[u];n++){let r=e(n);for(let s=8;s>0;s--)r=i(r);t[n]=r}return t},Us=Qr(new Y(256),t=>t,t=>t&128?7^t<<1:t<<1),D=[Qr(new Uint16Array(256),t=>t<<8,t=>t<<1^(t&32768?32773:0))],E=[Qr(new Uint32Array(256),t=>t,t=>t>>>1^(t&1)*3988292384)];for(let t=0;t<15;t++){D.push(new Uint16Array(256)),E.push(new Uint32Array(256));for(let e=0;e<=255;e++)D[t+1][e]=D[0][D[t][e]>>>8]^D[t][e]<<8,E[t+1][e]=E[t][e]>>>8^E[0][E[t][e]&255]}var Ls=t=>{let e=0,i=t[u];for(let n=0;n!==i;n++)e=Us[e^t[n]];return e},Os=t=>{let e=t[u],i=e-16,n=0,r=0;for(;r<=i;)n^=t[r++]<<8|t[r++],n=D[15][n>>8]^D[14][n&255]^D[13][t[r++]]^D[12][t[r++]]^D[11][t[r++]]^D[10][t[r++]]^D[9][t[r++]]^D[8][t[r++]]^D[7][t[r++]]^D[6][t[r++]]^D[5][t[r++]]^D[4][t[r++]]^D[3][t[r++]]^D[2][t[r++]]^D[1][t[r++]]^D[0][t[r++]];for(;r!==e;)n=(n&255)<<8^D[0][n>>8^t[r++]];return n},Rs=t=>{let e=t[u],i=e-16,n=0,r=0;for(;r<=i;)n=E[15][(t[r++]^n)&255]^E[14][(t[r++]^n>>>8)&255]^E[13][(t[r++]^n>>>16)&255]^E[12][t[r++]^n>>>24]^E[11][t[r++]]^E[10][t[r++]]^E[9][t[r++]]^E[8][t[r++]]^E[7][t[r++]]^E[6][t[r++]]^E[5][t[r++]]^E[4][t[r++]]^E[3][t[r++]]^E[2][t[r++]]^E[1][t[r++]]^E[0][t[r++]];for(;r!==e;)n=E[0][(n^t[r++])&255]^n>>>8;return n^-1},Ir=(...t)=>{let e=new Y(t.reduce((i,n)=>i+n[u],0));return t.reduce((i,n)=>(e.set(n,i),i+n[u]),0),e},Se=t=>String.fromCharCode(...t),li=[0,8,4,12,2,10,6,14,1,9,5,13,3,11,7,15],kt=t=>li[t&15]<<4|li[t>>4],xs=class{constructor(t){this._data=t,this._pos=t[u]*8}set position(t){this._pos=t}get position(){return this._pos}read(t){let e=Math.floor(this._pos/8),i=this._pos%8;return this._pos-=t,(kt(this._data[e-1])<<8)+kt(this._data[e])>>7-i&255}},ks=(t,e)=>{try{return t.getBigInt64(e,!0)}catch{let i=t.getUint8(e+7)&128?-1:1,n=t.getUint32(e,!0),r=t.getUint32(e+4,!0);return i===-1&&(n=~n+1,r=~r+1),r>1048575&&console.warn("This platform does not support BigInt"),i*(n+r*2**32)}},Bs=class{constructor(t,e){this._onCodecHeader=t,this._onCodecUpdate=e,this[ve]()}[Be](){this._isEnabled=!0}[ve](){this._headerCache=new Map,this._codecUpdateData=new WeakMap,this._codecHeaderSent=!1,this._codecShouldUpdate=!1,this._bitrate=null,this._isEnabled=!1}[Ei](t,e){if(this._onCodecUpdate){this._bitrate!==t&&(this._bitrate=t,this._codecShouldUpdate=!0);let i=this._codecUpdateData.get(this._headerCache.get(this._currentHeader));this._codecShouldUpdate&&i&&this._onCodecUpdate({bitrate:t,...i},e),this._codecShouldUpdate=!1}}[N](t){let e=this._headerCache.get(t);return e&&this._updateCurrentHeader(t),e}[Ne](t,e,i){this._isEnabled&&(this._codecHeaderSent||(this._onCodecHeader({...e}),this._codecHeaderSent=!0),this._updateCurrentHeader(t),this._headerCache.set(t,e),this._codecUpdateData.set(e,i))}_updateCurrentHeader(t){this._onCodecUpdate&&t!==this._currentHeader&&(this._codecShouldUpdate=!0,this._currentHeader=t)}},X=new WeakMap,ue=new WeakMap,Ve=class{constructor(t,e){this._codecParser=t,this._headerCache=e}*[oi](){let t;do{if(t=yield*this.Frame[ye](this._codecParser,this._headerCache,0),t)return t;this._codecParser[oe](1)}while(!0)}*[Wt](t){let e=yield*this[oi](),i=ue.get(e)[u];if(t||this._codecParser._flushing||(yield*this.Header[N](this._codecParser,this._headerCache,i)))return this._headerCache[Be](),this._codecParser[oe](i),this._codecParser[qt](e),e;this._codecParser[ke](`Missing ${He} at ${i} bytes from current position.`,`Dropping current ${He} and trying again.`),this._headerCache[ve](),this._codecParser[oe](1)}},Oi=class{constructor(t,e){ue.set(this,{[se]:t}),this[k]=e}},st=class extends Oi{static*[ye](t,e,i,n,r){let s=yield*t[N](i,n,r);if(s){let a=X.get(s)[he],o=X.get(s)[F],h=(yield*i[L](a,r))[A](0,a);return new e(s,h,o)}else return null}constructor(t,e,i){super(t,e),this[se]=t,this[F]=i,this[Ce]=i/t[U]*1e3,this[Ze]=null,this[Dt]=null,this[xt]=null,this[Et]=null,ue.get(this)[u]=e[u]}},gr="unsynchronizationFlag",vr="extendedHeaderFlag",Hr="experimentalFlag",yr="footerPresent",Ns=class Ri{static*getID3v2Header(e,i,n){let s={},a=yield*e[L](3,n);if(a[0]!==73||a[1]!==68||a[2]!==51||(a=yield*e[L](10,n),s[$e]=`id3v2.${a[3]}.${a[4]}`,a[5]&15)||(s[gr]=!!(a[5]&128),s[vr]=!!(a[5]&64),s[Hr]=!!(a[5]&32),s[yr]=!!(a[5]&16),a[6]&128||a[7]&128||a[8]&128||a[9]&128))return null;let o=a[6]<<21|a[7]<<14|a[8]<<7|a[9];return s[u]=10+o,new Ri(s)}constructor(e){this[$e]=e[$e],this[gr]=e[gr],this[vr]=e[vr],this[Hr]=e[Hr],this[yr]=e[yr],this[u]=e[u]}},nt=class{constructor(t){X.set(this,t),this[le]=t[le],this[W]=null,this[S]=t[S],this[ce]=t[ce],this[U]=t[U]}},xi={0:[We,We,We,We,We],16:[32,32,32,32,8],240:[G,G,G,G,G]},_t=(t,e,i)=>8*((t+i)%e+e)*(1<<(t+i)/e)-8*e*(e/8|0);for(let t=2;t<15;t++)xi[t<<4]=[t*32,_t(t,4,0),_t(t,4,-1),_t(t,8,4),_t(t,8,0)];var Ts=0,Vs=1,Qs=2,Gs=3,ci=4,gt="bands ",vt=" to 31",hi={0:gt+4+vt,16:gt+8+vt,32:gt+12+vt,48:gt+16+vt},fe="bitrateIndex",et="v2",Ut="v1",Ht="Intensity stereo ",yt=", MS stereo ",St="on",bt="off",qs={0:Ht+bt+yt+bt,16:Ht+St+yt+bt,32:Ht+bt+yt+St,48:Ht+St+yt+St},Sr={0:{[v]:I},2:{[v]:"Layer III",[re]:1,[me]:qs,[Ut]:{[fe]:Qs,[F]:1152},[et]:{[fe]:ci,[F]:576}},4:{[v]:"Layer II",[re]:1,[me]:hi,[F]:1152,[Ut]:{[fe]:Vs},[et]:{[fe]:ci}},6:{[v]:"Layer I",[re]:4,[me]:hi,[F]:384,[Ut]:{[fe]:Ts},[et]:{[fe]:Gs}}},br="MPEG Version ",ui="ISO/IEC ",Ws={0:{[v]:`${br}2.5 (later extension of MPEG 2)`,[K]:et,[U]:{0:Mi,4:bi,8:kr,12:I}},8:{[v]:I},16:{[v]:`${br}2 (${ui}13818-3)`,[K]:et,[U]:{0:Rr,4:Or,8:xr,12:I}},24:{[v]:`${br}1 (${ui}11172-3)`,[K]:Ut,[U]:{0:Ur,4:Bt,8:Lr,12:I}},length:u},Ks={0:Li,1:Vr},zs={0:Vr,1:"50/15 ms",2:I,3:"CCIT J.17"},di={0:{[S]:2,[v]:Pe},64:{[S]:2,[v]:"joint "+Pe},128:{[S]:2,[v]:"dual channel"},192:{[S]:1,[v]:tt}},ki=class Cr extends nt{static*[N](e,i,n){let r={},s=yield*Ns.getID3v2Header(e,i,n);s&&(yield*e[L](s[u],n),e[oe](s[u]));let a=yield*e[L](4,n),o=Se(a[A](0,4)),h=i[N](o);if(h)return new Cr(h);if(a[0]!==255||a[1]<224)return null;let l=Ws[a[1]&24];if(l[v]===I)return null;let d=a[1]&6;if(Sr[d][v]===I)return null;let c={...Sr[d],...Sr[d][l[K]]};if(r[Ue]=l[v],r[K]=c[v],r[F]=c[F],r[Le]=Ks[a[1]&1],r[u]=4,r[W]=xi[a[2]&240][c[fe]],r[W]===G||(r[U]=l[U][a[2]&12],r[U]===I)||(r[re]=a[2]&2&&c[re],r[Ee]=!!(a[2]&1),r[he]=Math.floor(125*r[W]*r[F]/r[U]+r[re]),!r[he]))return null;let f=a[3]&192;if(r[ce]=di[f][v],r[S]=di[f][S],r[me]=c[me][a[3]&48],r[tr]=!!(a[3]&8),r[De]=!!(a[3]&4),r[dt]=zs[a[3]&3],r[dt]===I)return null;r[le]=16;{let{length:w,frameLength:b,samples:g,...m}=r;i[Ne](o,r,m)}return new Cr(r)}constructor(e){super(e),this[W]=e[W],this[dt]=e[dt],this[re]=e[re],this[tr]=e[tr],this[De]=e[De],this[Ee]=e[Ee],this[K]=e[K],this[me]=e[me],this[Ue]=e[Ue],this[Le]=e[Le]}},Xs=class Bi extends st{static*[ye](e,i,n){return yield*super[ye](ki,Bi,e,i,n)}constructor(e,i,n){super(e,i,n)}},Js=class extends Ve{constructor(t,e,i){super(t,e),this.Frame=Xs,this.Header=ki,i(this[x])}get[x](){return Ci}*[it](){return yield*this[Wt]()}},js={0:"MPEG-4",8:"MPEG-2"},Ys={0:"valid",2:G,4:G,6:G},$s={0:Li,1:Vr},Zs={0:"AAC Main",64:"AAC LC (Low Complexity)",128:"AAC SSR (Scalable Sample Rate)",192:"AAC LTP (Long Term Prediction)"},en={0:yi,4:Si,8:As,12:Bt,16:Ur,20:Lr,24:Or,28:Rr,32:xr,36:bi,40:Mi,44:kr,48:Ps,52:I,56:I,60:"frequency is written explicitly"},pi={0:{[S]:0,[v]:"Defined in AOT Specific Config"},64:{[S]:1,[v]:tt},128:{[S]:2,[v]:R(2,_[0][0])},192:{[S]:3,[v]:R(3,_[1][3])},256:{[S]:4,[v]:R(4,_[1][3],_[3][4])},320:{[S]:5,[v]:R(5,_[1][3],_[3][0])},384:{[S]:6,[v]:R(6,_[1][3],_[3][0],ne)},448:{[S]:8,[v]:R(8,_[1][3],_[2][0],_[3][0],ne)}},Ni=class Ti extends nt{static*[N](e,i,n){let r={},s=yield*e[L](7,n),a=Se([s[0],s[1],s[2],s[3]&252|s[6]&3]),o=i[N](a);if(o)Object.assign(r,o);else{if(s[0]!==255||s[1]<240||(r[Ue]=js[s[1]&8],r[K]=Ys[s[1]&6],r[K]===G))return null;let l=s[1]&1;r[Le]=$s[l],r[u]=l?7:9,r[or]=s[2]&192,r[ie]=s[2]&60;let d=s[2]&2;if(r[ar]=Zs[r[or]],r[U]=en[r[ie]],r[U]===I)return null;r[Ee]=!!d,r[ft]=(s[2]<<8|s[3])&448,r[ce]=pi[r[ft]][v],r[S]=pi[r[ft]][S],r[De]=!!(s[3]&32),r[rr]=!!(s[3]&8),r[dr]=!!(s[3]&8),r[pr]=!!(s[3]&4),r[le]=16,r[F]=1024,r[sr]=s[6]&3;{let{length:c,channelModeBits:f,profileBits:w,sampleRateBits:b,frameLength:g,samples:m,numberAACFrames:P,...q}=r;i[Ne](a,r,q)}}if(r[he]=(s[3]<<11|s[4]<<3|s[5]>>5)&8191,!r[he])return null;let h=(s[5]<<6|s[6]>>2)&2047;return r[$t]=h===2047?"VBR":h,new Ti(r)}constructor(e){super(e),this[dr]=e[dr],this[pr]=e[pr],this[$t]=e[$t],this[rr]=e[rr],this[De]=e[De],this[Ee]=e[Ee],this[K]=e[K],this[u]=e[u],this[Ue]=e[Ue],this[sr]=e[sr],this[ar]=e[ar],this[Le]=e[Le]}get audioSpecificConfig(){let e=X.get(this),i=e[or]+64<<5|e[ie]<<5|e[ft]>>3,n=new Y(2);return new zt(n[rt]).setUint16(0,i,!1),n}},tn=class Vi extends st{static*[ye](e,i,n){return yield*super[ye](Ni,Vi,e,i,n)}constructor(e,i,n){super(e,i,n)}},rn=class extends Ve{constructor(t,e,i){super(t,e),this.Frame=tn,this.Header=Ni,i(this[x])}get[x](){return"aac"}*[it](){return yield*this[Wt]()}},Mt=class Fr extends st{static _getFrameFooterCrc16(e){return(e[e[u]-2]<<8)+e[e[u]-1]}static[Ui](e){let i=Fr._getFrameFooterCrc16(e),n=Os(e[A](0,-2));return i===n}constructor(e,i,n){i[Pi]=n,i[wi]=Fr._getFrameFooterCrc16(e),super(i,e,X.get(i)[F])}},Qi="get from STREAMINFO metadata block",sn={0:"Fixed",1:"Variable"},Gi={0:I,16:192};for(let t=2;t<16;t++)Gi[t<<4]=t<6?576*2**(t-2):2**t;var nn={0:Qi,1:Si,2:Fs,3:Cs,4:kr,5:xr,6:Rr,7:Or,8:Lr,9:Ur,10:Bt,11:yi,15:G},an={0:{[S]:1,[v]:tt},16:{[S]:2,[v]:R(2,_[0][0])},32:{[S]:3,[v]:R(3,_[0][1])},48:{[S]:4,[v]:R(4,_[1][0],_[3][0])},64:{[S]:5,[v]:R(5,_[1][1],_[3][0])},80:{[S]:6,[v]:R(6,_[1][1],ne,_[3][0])},96:{[S]:7,[v]:R(7,_[1][1],ne,_[3][4],_[2][0])},112:{[S]:8,[v]:R(8,_[1][1],ne,_[3][0],_[2][0])},128:{[S]:2,[v]:`${Pe} (left, diff)`},144:{[S]:2,[v]:`${Pe} (diff, right)`},160:{[S]:2,[v]:`${Pe} (avg, diff)`},176:I,192:I,208:I,224:I,240:I},on={0:Qi,2:8,4:12,6:I,8:16,10:20,12:24,14:I},wt=class Lt extends nt{static _decodeUTF8Int(e){if(e[0]>254)return null;if(e[0]<128)return{value:e[0],length:1};let i=1;for(let a=64;a&e[0];a>>=1)i++;let n=i-1,r=0,s=0;for(;n>0;s+=6,n--){if((e[n]&192)!==128)return null;r|=(e[n]&63)<<s}return r|=(e[n]&127>>i)<<s,{value:r,length:i}}static[Te](e,i){let n={[L]:function*(){return e}};return Lt[N](n,i,0).next().value}static*[N](e,i,n){let r=yield*e[L](6,n);if(r[0]!==255||!(r[1]===248||r[1]===249))return null;let s={},a=Se(r[A](0,4)),o=i[N](a);if(o)Object.assign(s,o);else{if(s[hr]=r[1]&1,s[cr]=sn[s[hr]],s[pt]=r[2]&240,s[ie]=r[2]&15,s[de]=Gi[s[pt]],s[de]===I||(s[U]=nn[s[ie]],s[U]===G)||r[3]&1)return null;let l=an[r[3]&240];if(l===I||(s[S]=l[S],s[ce]=l[v],s[le]=on[r[3]&14],s[le]===I))return null}s[u]=5,r=yield*e[L](s[u]+8,n);let h=Lt._decodeUTF8Int(r[A](4));if(!h||(s[hr]?s[mr]=h.value:s[Ze]=h.value,s[u]+=h[u],s[pt]===96?(r[u]<s[u]&&(r=yield*e[L](s[u],n)),s[de]=r[s[u]-1]+1,s[u]+=1):s[pt]===112&&(r[u]<s[u]&&(r=yield*e[L](s[u],n)),s[de]=(r[s[u]-1]<<8)+r[s[u]]+1,s[u]+=2),s[F]=s[de],s[ie]===12?(r[u]<s[u]&&(r=yield*e[L](s[u],n)),s[U]=r[s[u]-1]*1e3,s[u]+=1):s[ie]===13?(r[u]<s[u]&&(r=yield*e[L](s[u],n)),s[U]=(r[s[u]-1]<<8)+r[s[u]],s[u]+=2):s[ie]===14&&(r[u]<s[u]&&(r=yield*e[L](s[u],n)),s[U]=((r[s[u]-1]<<8)+r[s[u]])*10,s[u]+=2),r[u]<s[u]&&(r=yield*e[L](s[u],n)),s[Ot]=r[s[u]-1],s[Ot]!==Ls(r[A](0,s[u]-1))))return null;if(!o){let{blockingStrategyBits:l,frameNumber:d,sampleNumber:c,samples:f,sampleRateBits:w,blockSizeBits:b,crc:g,length:m,...P}=s;i[Ne](a,s,P)}return new Lt(s)}constructor(e){super(e),this[wi]=null,this[cr]=e[cr],this[de]=e[de],this[Ze]=e[Ze],this[mr]=e[mr],this[Pi]=null}},ln=2,cn=512*1024,qi=class extends Ve{constructor(t,e,i){super(t,e),this.Frame=Mt,this.Header=wt,i(this[x])}get[x](){return"flac"}*_getNextFrameSyncOffset(t){let e=yield*this._codecParser[L](2,0),i=e[u]-2;for(;t<i;){if(e[t]===255){let r=e[t+1];if(r===248||r===249)break;r!==255&&t++}t++}return t}*[it](){do{let t=yield*wt[N](this._codecParser,this._headerCache,0);if(t){let e=X.get(t)[u]+ln;for(;e<=cn;){if(this._codecParser._flushing||(yield*wt[N](this._codecParser,this._headerCache,e))){let i=yield*this._codecParser[L](e);if(this._codecParser._flushing||(i=i[A](0,e)),Mt[Ui](i)){let n=new Mt(i,t);return this._headerCache[Be](),this._codecParser[oe](e),this._codecParser[qt](n),n}}e=yield*this._getNextFrameSyncOffset(e+1)}this._codecParser[ke](`Unable to sync FLAC frame after searching ${e} bytes.`),this._codecParser[oe](e)}else this._codecParser[oe](yield*this._getNextFrameSyncOffset(1))}while(!0)}[Kt](t){return t[T]===0?(this._headerCache[Be](),this._streamInfo=t[k][A](13)):t[T]===1||(t[j]=ue.get(t)[_e].map(e=>{let i=wt[Te](e,this._headerCache);if(i)return new Mt(e,i,this._streamInfo);this._codecParser[ke]("Failed to parse Ogg FLAC frame","Skipping invalid FLAC frame")}).filter(e=>!!e)),t}},Wi=class Ki{static*[N](e,i,n){let r={},s=yield*e[L](28,n);if(s[0]!==79||s[1]!==103||s[2]!==103||s[3]!==83||(r[Es]=s[4],s[5]&248))return null;r[ae]=!!(s[5]&4),r[Ye]=!!(s[5]&2),r[je]=!!(s[5]&1);let o=new zt(Y.from(s[A](0,28))[rt]);r[ge]=ks(o,6),r[Oe]=o.getInt32(14,!0),r[T]=o.getInt32(18,!0),r[Pt]=o.getInt32(22,!0);let h=s[26];r[u]=h+27,s=yield*e[L](r[u],n),r[he]=0,r[Je]=[],r[Rt]=Y.from(s[A](27,r[u]));for(let l=0,d=0;l<h;l++){let c=r[Rt][l];r[he]+=c,d+=c,(c!==255||l===h-1)&&(r[Je].push(d),d=0)}return new Ki(r)}constructor(e){X.set(this,e),this[ge]=e[ge],this[je]=e[je],this[Ye]=e[Ye],this[ae]=e[ae],this[Je]=e[Je],this[T]=e[T],this[Pt]=e[Pt],this[Oe]=e[Oe]}},hn=class zi extends Oi{static*[ye](e,i,n){let r=yield*Wi[N](e,i,n);if(r){let s=X.get(r)[he],a=X.get(r)[u],o=a+s,h=(yield*e[L](o,0))[A](0,o),l=h[A](a,o);return new zi(r,l,h)}else return null}constructor(e,i,n){super(e,i),ue.get(this)[u]=n[u],this[j]=[],this[Ds]=n,this[ge]=e[ge],this[Ii]=e[Pt],this[Ce]=0,this[je]=e[je],this[Ye]=e[Ye],this[ae]=e[ae],this[T]=e[T],this[F]=0,this[Oe]=e[Oe]}},fi=class extends st{constructor(t,e,i){super(e,t,i)}},mi={0:wr.slice(0,2),1:wr},Q="SILK-only",B="CELT-only",It="Hybrid",ee="narrowband",Ct="medium-band",te="wideband",Me="super-wideband",we="fullband",un={0:{[H]:Q,[M]:ee,[y]:10},8:{[H]:Q,[M]:ee,[y]:20},16:{[H]:Q,[M]:ee,[y]:40},24:{[H]:Q,[M]:ee,[y]:60},32:{[H]:Q,[M]:Ct,[y]:10},40:{[H]:Q,[M]:Ct,[y]:20},48:{[H]:Q,[M]:Ct,[y]:40},56:{[H]:Q,[M]:Ct,[y]:60},64:{[H]:Q,[M]:te,[y]:10},72:{[H]:Q,[M]:te,[y]:20},80:{[H]:Q,[M]:te,[y]:40},88:{[H]:Q,[M]:te,[y]:60},96:{[H]:It,[M]:Me,[y]:10},104:{[H]:It,[M]:Me,[y]:20},112:{[H]:It,[M]:we,[y]:10},120:{[H]:It,[M]:we,[y]:20},128:{[H]:B,[M]:ee,[y]:2.5},136:{[H]:B,[M]:ee,[y]:5},144:{[H]:B,[M]:ee,[y]:10},152:{[H]:B,[M]:ee,[y]:20},160:{[H]:B,[M]:te,[y]:2.5},168:{[H]:B,[M]:te,[y]:5},176:{[H]:B,[M]:te,[y]:10},184:{[H]:B,[M]:te,[y]:20},192:{[H]:B,[M]:Me,[y]:2.5},200:{[H]:B,[M]:Me,[y]:5},208:{[H]:B,[M]:Me,[y]:10},216:{[H]:B,[M]:Me,[y]:20},224:{[H]:B,[M]:we,[y]:2.5},232:{[H]:B,[M]:we,[y]:5},240:{[H]:B,[M]:we,[y]:10},248:{[H]:B,[M]:we,[y]:20}},_i=class Ar extends nt{static[Te](e,i,n){let r={};if(r[S]=e[9],r[pe]=e[18],r[u]=r[pe]!==0?21+r[S]:19,e[u]<r[u])throw new Error("Out of data while inside an Ogg Page");let s=i[0]&3,a=s===3?2:1,o=Se(e[A](0,r[u]))+Se(i[A](0,a)),h=n[N](o);if(h)return new Ar(h);if(o.substr(0,8)!=="OpusHead"||e[8]!==1)return null;r[k]=Y.from(e[A](0,r[u]));let l=new zt(r[k][rt]);if(r[le]=16,r[Ft]=l.getUint16(10,!0),r[fr]=l.getUint32(12,!0),r[U]=Bt,r[nr]=l.getInt16(16,!0),r[pe]in mi&&(r[ce]=mi[r[pe]][r[S]-1],!r[ce]))return null;r[pe]!==0&&(r[_r]=e[19],r[Zt]=e[20],r[ur]=[...e[A](21,r[S]+21)]);let d=un[248&i[0]];switch(r[H]=d[H],r[M]=d[M],r[y]=d[y],s){case 0:r[Ie]=1;break;case 1:case 2:r[Ie]=2;break;case 3:r[ir]=!!(128&i[1]),r[er]=!!(64&i[1]),r[Ie]=63&i[1];break;default:return null}{let{length:c,data:f,channelMappingFamily:w,...b}=r;n[Ne](o,r,b)}return new Ar(r)}constructor(e){super(e),this[k]=e[k],this[M]=e[M],this[pe]=e[pe],this[ur]=e[ur],this[Zt]=e[Zt],this[Ie]=e[Ie],this[y]=e[y],this[er]=e[er],this[fr]=e[fr],this[ir]=e[ir],this[H]=e[H],this[nr]=e[nr],this[Ft]=e[Ft],this[_r]=e[_r]}},dn=class extends Ve{constructor(t,e,i){super(t,e),this.Frame=fi,this.Header=_i,i(this[x]),this._identificationHeader=null,this._preSkipRemaining=null}get[x](){return"opus"}[Kt](t){return t[T]===0?(this._headerCache[Be](),this._identificationHeader=t[k]):t[T]===1||(t[j]=ue.get(t)[_e].map(e=>{let i=_i[Te](this._identificationHeader,e,this._headerCache);if(i){this._preSkipRemaining===null&&(this._preSkipRemaining=i[Ft]);let n=i[y]*i[Ie]/1e3*i[U];return this._preSkipRemaining>0&&(this._preSkipRemaining-=n,n=this._preSkipRemaining<0?-this._preSkipRemaining:0),new fi(e,i,n)}this._codecParser[Di]("Failed to parse Ogg Opus Header","Not a valid Ogg Opus file")})),t}},gi=class extends st{constructor(t,e,i){super(e,t,i)}},Pr={};for(let t=0;t<8;t++)Pr[t+6]=2**(6+t);var pn=class Dr extends nt{static[Te](e,i,n,r){if(e[u]<30)throw new Error("Out of data while inside an Ogg Page");let s=Se(e[A](0,30)),a=i[N](s);if(a)return new Dr(a);let o={[u]:30};if(s.substr(0,7)!=="vorbis")return null;o[k]=Y.from(e[A](0,30));let h=new zt(o[k][rt]);if(o[$e]=h.getUint32(7,!0),o[$e]!==0||(o[S]=e[11],o[ce]=wr[o[S]-1]||"application defined",o[U]=h.getUint32(12,!0),o[Jt]=h.getInt32(16,!0),o[Yt]=h.getInt32(20,!0),o[jt]=h.getInt32(24,!0),o[Xe]=Pr[(e[28]&240)>>4],o[ze]=Pr[e[28]&15],o[ze]>o[Xe])||e[29]!==1)return null;o[le]=32,o[At]=r,o[lr]=n;{let{length:l,data:d,version:c,vorbisSetup:f,vorbisComments:w,...b}=o;i[Ne](s,o,b)}return new Dr(o)}constructor(e){super(e),this[Jt]=e[Jt],this[jt]=e[jt],this[Yt]=e[Yt],this[ze]=e[ze],this[Xe]=e[Xe],this[k]=e[k],this[lr]=e[lr],this[At]=e[At]}},fn=class extends Ve{constructor(t,e,i){super(t,e),this.Frame=gi,i(this[x]),this._identificationHeader=null,this._setupComplete=!1,this._prevBlockSize=null}get[x](){return Nt}[Kt](t){t[j]=[];for(let e of ue.get(t)[_e])if(e[0]===1)this._headerCache[Be](),this._identificationHeader=t[k],this._setupComplete=!1;else if(e[0]===3)this._vorbisComments=e;else if(e[0]===5)this._vorbisSetup=e,this._mode=this._parseSetupHeader(e),this._setupComplete=!0;else if(this._setupComplete){let i=pn[Te](this._identificationHeader,this._headerCache,this._vorbisComments,this._vorbisSetup);i?t[j].push(new gi(e,i,this._getSamples(e,i))):this._codecParser[logError]("Failed to parse Ogg Vorbis Header","Not a valid Ogg Vorbis file")}return t}_getSamples(t,e){let n=this._mode.blockFlags[t[0]>>1&this._mode.mask]?e[Xe]:e[ze],r=this._prevBlockSize===null?0:(this._prevBlockSize+n)/4;return this._prevBlockSize=n,r}_parseSetupHeader(t){let e=new xs(t),i={count:0,blockFlags:[]};for(;(e.read(1)&1)!==1;);let n;for(;i.count<64&&e.position>0;){kt(e.read(8));let r=0;for(;e.read(8)===0&&r++<3;);if(r===4)n=e.read(7),i.blockFlags.unshift(n&1),e.position+=6,i.count++;else{((kt(n)&126)>>1)+1!==i.count&&this._codecParser[ke]("vorbis derived mode count did not match actual mode count");break}}return i.mask=(1<<Math.log2(i.count))-1,i}},mn=class{constructor(t,e,i){this._codecParser=t,this._headerCache=e,this._onCodec=i,this._continuedPacket=new Y,this._codec=null,this._isSupported=null,this._previousAbsoluteGranulePosition=null}get[x](){return this._codec||""}_updateCodec(t,e){this._codec!==t&&(this._headerCache[ve](),this._parser=new e(this._codecParser,this._headerCache,this._onCodec),this._codec=t)}_checkCodecSupport({data:t}){let e=Se(t[A](0,8));switch(e){case"fishead\0":return!1;case"OpusHead":return this._updateCodec("opus",dn),!0;case(/^\x7fFLAC/.test(e)&&e):return this._updateCodec("flac",qi),!0;case(/^\x01vorbis/.test(e)&&e):return this._updateCodec(Nt,fn),!0;default:return!1}}_checkPageSequenceNumber(t){t[T]!==this._pageSequenceNumber+1&&this._pageSequenceNumber>1&&t[T]>1&&this._codecParser[ke]("Unexpected gap in Ogg Page Sequence Number.",`Expected: ${this._pageSequenceNumber+1}, Got: ${t[T]}`),this._pageSequenceNumber=t[T]}_parsePage(t){this._isSupported===null&&(this._pageSequenceNumber=t[T],this._isSupported=this._checkCodecSupport(t)),this._checkPageSequenceNumber(t);let e=ue.get(t),i=X.get(e[se]),n=0;if(e[_e]=i[Je].map(r=>t[k][A](n,n+=r)),this._continuedPacket[u]&&(e[_e][0]=Ir(this._continuedPacket,e[_e][0]),this._continuedPacket=new Y),i[Rt][i[Rt][u]-1]===255&&(this._continuedPacket=Ir(this._continuedPacket,e[_e].pop())),this._previousAbsoluteGranulePosition!==null&&(t[F]=Number(t[ge]-this._previousAbsoluteGranulePosition)),this._previousAbsoluteGranulePosition=t[ge],this._isSupported){let r=this._parser[Kt](t);return this._codecParser[qt](r),r}else return t}},_n=class extends Ve{constructor(t,e,i){super(t,e),this._onCodec=i,this.Frame=hn,this.Header=Wi,this._streams=new Map,this._currentSerialNumber=null}get[x](){let t=this._streams.get(this._currentSerialNumber);return t?t.codec:""}*[it](){let t=yield*this[Wt](!0);this._currentSerialNumber=t[Oe];let e=this._streams.get(this._currentSerialNumber);return e||(e=new mn(this._codecParser,this._headerCache,this._onCodec),this._streams.set(this._currentSerialNumber,e)),t[ae]&&this._streams.delete(this._currentSerialNumber),e._parsePage(t)}},Mr=()=>{},gn=class{constructor(t,{onCodec:e,onCodecHeader:i,onCodecUpdate:n,enableLogging:r=!1,enableFrameCRC32:s=!0}={}){this._inputMimeType=t,this._onCodec=e||Mr,this._onCodecHeader=i||Mr,this._onCodecUpdate=n,this._enableLogging=r,this._crc32=s?Rs:Mr,this[ve]()}get[x](){return this._parser?this._parser[x]:""}[ve](){this._headerCache=new Bs(this._onCodecHeader,this._onCodecUpdate),this._generator=this._getGenerator(),this._generator.next()}*flush(){this._flushing=!0;for(let t=this._generator.next();t.value;t=this._generator.next())yield t.value;this._flushing=!1,this[ve]()}*parseChunk(t){for(let e=this._generator.next(t);e.value;e=this._generator.next())yield e.value}parseAll(t){return[...this.parseChunk(t),...this.flush()]}*_getGenerator(){if(this._inputMimeType.match(/aac/))this._parser=new rn(this,this._headerCache,this._onCodec);else if(this._inputMimeType.match(/mpeg/))this._parser=new Js(this,this._headerCache,this._onCodec);else if(this._inputMimeType.match(/flac/))this._parser=new qi(this,this._headerCache,this._onCodec);else if(this._inputMimeType.match(/ogg/))this._parser=new _n(this,this._headerCache,this._onCodec);else throw new Error(`Unsupported Codec ${mimeType}`);for(this._frameNumber=0,this._currentReadPosition=0,this._totalBytesIn=0,this._totalBytesOut=0,this._totalSamples=0,this._sampleRate=void 0,this._rawData=new Uint8Array(0);;){let t=yield*this._parser[it]();t&&(yield t)}}*[L](t=0,e=0){let i;for(;this._rawData[u]<=t+e;){if(i=yield,this._flushing)return this._rawData[A](e);i&&(this._totalBytesIn+=i[u],this._rawData=Ir(this._rawData,i))}return this._rawData[A](e)}[oe](t){this._currentReadPosition+=t,this._rawData=this._rawData[A](t)}[mt](t){this._sampleRate=t[se][U],t[se][W]=t[Ce]>0?Math.round(t[k][u]/t[Ce])*8:0,t[Ze]=this._frameNumber++,t[Dt]=this._totalBytesOut,t[xt]=this._totalSamples,t[Et]=this._totalSamples/this._sampleRate*1e3,t[Ii]=this._crc32(t[k]),this._headerCache[Ei](t[se][W],t[Et]),this._totalBytesOut+=t[k][u],this._totalSamples+=t[F]}[qt](t){if(t[j]){if(t[ae]){let e=t[F];t[j].forEach(i=>{let n=i[F];e<n&&(i[F]=e>0?e:0,i[Ce]=i[F]/i[se][U]*1e3),e-=n,this[mt](i)})}else t[F]=0,t[j].forEach(e=>{t[F]+=e[F],this[mt](e)});t[Ce]=t[F]/this._sampleRate*1e3||0,t[xt]=this._totalSamples,t[Et]=this._totalSamples/this._sampleRate*1e3||0,t[Dt]=this._totalBytesOut}else this[mt](t)}_log(t,e){if(this._enableLogging){let i=[`${x}:         ${this[x]}`,`inputMimeType: ${this._inputMimeType}`,`readPosition:  ${this._currentReadPosition}`,`totalBytesIn:  ${this._totalBytesIn}`,`${Dt}: ${this._totalBytesOut}`],n=Math.max(...i.map(r=>r[u]));e.push(`--stats--${"-".repeat(n-9)}`,...i,"-".repeat(n)),t("codec-parser",e.reduce((r,s)=>r+`
+  `+s,""))}}[ke](...t){this._log(console.warn,t)}[Di](...t){this._log(console.error,t)}},Xi=gn,Re=j,xe=k,Ji=se,ji=ae,Yi=At,$i=xt;function Fe(t){var e=e;function i(){}e={};function n(p){throw p}var r,s,a,o,h,l,d,c,f,w,b;function g(){var p=b.buffer;r=new Int8Array(p),s=new Int16Array(p),o=new Uint8Array(p),h=new Uint16Array(p),a=new Int32Array(p),l=new Uint32Array(p),d=new Float32Array(p),c=new Float64Array(p),f=new BigInt64Array(p),w=new BigUint64Array(p)}for(var m=p=>{for(var V,Ge,be=0,lt=0,ct=p.length,ht=new Uint8Array((ct*3>>2)-(p[ct-2]=="=")-(p[ct-1]=="="));be<ct;be+=4,lt+=3)V=J[p.charCodeAt(be+1)],Ge=J[p.charCodeAt(be+2)],ht[lt]=J[p.charCodeAt(be)]<<2|V>>4,ht[lt+1]=V<<4|Ge>>2,ht[lt+2]=Ge<<6|J[p.charCodeAt(be+3)];return ht},P=()=>n(""),q=()=>{},$={},Qe=p=>p(),os=()=>performance.now(),ls=(p,V)=>{if($[p]&&(clearTimeout($[p].id),delete $[p]),!V)return 0;var Ge=setTimeout(()=>{delete $[p],Qe(()=>ii(p,os()))},V);return $[p]={id:Ge,timeout_ms:V},0},cs=Math.atan,hs=Math.cos,us=Math.exp,ds=Math.log,ps=Math.pow,fs=Math.sin,ms=p=>{var V=o.length;return p>>>=0,!1},_s=p=>{throw`exit(${p})`},J=new Uint8Array(123),Z=25;Z>=0;--Z)J[48+Z]=52+Z,J[65+Z]=Z,J[97+Z]=26+Z;J[43]=62,J[47]=63;var gs={e:P,d:q,f:ls,b:cs,a:hs,i:us,h:ds,g:ps,c:fs,k:ms,j:_s};function vs(p){jr=p.n,Yr=p.o,$r=p.p,Zr=p.q,ei=p.r,ti=p.s,ri=p.t,ii=p.v}var jr,Yr,$r,Zr,ei,ti,ri,ii;function Hs(p){p.m()}Fe.wasm||Object.defineProperty(Fe,"wasm",{get:()=>String.raw`dynEncode012091253f87dì%nä= 4& ¿nÝØäÂLÚªã9ÚØ[äº\ ¼¡³R=}L]Èÿ2 ÿù¶J1jj¡é,zäV|i¸Qk¹= 
 ¨¨%ýv²±»oúâLa:ê±ÊäÌÓ.÷Øý×>àW>z¯°8¯ñ\Ñós9\§ôÊ@Ü (tÃø4° ¢7fqÓg²Jè6x[zç®&4=} p.(°tÍÞã¾>÷CõË"*k?¿~7~H2ÛÜâ.ÏQä;6{ÜãFÑá'DD¤±°HQ>MínÎÏÎöÊµÑÓÞÌP¼P¨Þ* X²E=MÂ¦qíxMÃ±=MÌë4/<gNO/¢	¢>a~Ï®ììììì0ìaç¬¡çëOÓÇM	Q9tùµyuéµµÞÏ/±Óõò}E{òÓJ¹Û|·ôfÒ c¬WêaûÿlÊ½p¹|)ÖEL¦	}ypÕSÏ¹I]¢ºãæ°ÿo¶7ÛRq¾ÔÅEßØ]æËwÚ{óçVwó1¾E­Øpàe"Æùû¡Áª Ààð´LõÎxEÓ¢N¦9ëùi&	Ò§Ø!ÇFçS=MbäO?ß·ç¸ª7ùa}5ðûÕtsUþ£KïgN¾)ø§\V0uSIö:ÌU4Ð¶¯´Õn9ÔèE£ZÆ¼{hµmÙ¾6ÆÑ+xñ´«þ¸=Mß¤·å®«ïÆGFÝì|H?ä E"þ!9«Æïpæ'][¯ù·£W÷O§&#ax$qf=}ø ô bÏ×W÷LôoÝWQÕÓ)u÷½èV|¥Gà¨Ö¸@ê|ÇK5ò	A·Â9CS2¸¼¿,äÝÑÝy!ÑR%ÆÝÎ0Âv§ qTcó±hØÉã=}Z=}Ælü­ën¯ð(-°ÜwVÏï.th¥í­S~SÏ»ZZÔZ 
 3BÌÛ¬<éæO)ÎyÚ¯O*®uìÛ$öI¥Ý9ôø³\¤ò³Ù¹ÇP¸J×y@ÔyOÇmô½ü¾|S?2àú¤F?½ûoo3ô;<àáûÜ8ì²7ïë¨RäY¹|ÓºÌF,Ð-¸*\P!FJÒ8= o6HwLrúº¶ÐÛ\Ù¬o¢9IqÝ.ôf¶ÎÈ{Äª×N|Mfs¤ÉÝàâ§*+ã§­ô¯î¬7ç×§ä)!Z¨É,Äp~ý·wsSGóäsE\ýïé§Ö:Ò'Cç(_X$\¦½eÒ8$ XF|eíÙÓ¡¤Û<ØÞÛ¸9¿ðÃÎ#b~× 4éîÿÏq
  ód|0wU&®è·vh6¨{ÚçÚ18Ó(ÓY\0¦= çèíß)Ø=}[xü-v?N(Kkg 0}âÚ´ð¬ÕQNÍ¢usÑ³=}.	ëgû= ÍMBp'²¨ x4è@9t§eÝµ¾âð½ z?Z¹FH'Ì¯¿<K,üµ<{	¶JãývåàÆeù0Ð"F¥ÃÒÞþÔÉvCzl}ðN£	Í^P%²¸FX»WÎêô¶äÉJ^g×SÃã.Ät*'ªG«ÒB<ÜÓ¿ºp­\àuV¯£ÅÝ½áÞ ùß=}ÎÚ^ÿí>¥! ¨ â=M·?*/¤"å)â·ÿîÿî*(%*2[½"üríÔ4l½»a}¯CwpCÓèìGc-ã6®=M32k?Êg­!So-x>³G+ã@ò, ÁïáåN0þÙè.~È÷¡vTr¶­Ã[üB±º»ávëw¹{pÜºû"Aæ±9Æ^¹³òïRIAy5GÂwÉf4@Tù|qý7ðªwBL|Ôqv!ª°|]KiÐJVQ5¸åõ§å"H¼0e¬<óBîÚSÏUìHPÙA+çÉ'seÌNf°@ÈM,ð½egÖ¬x©û½2~«Ò1;Ö«¯°4&90èE»Ó×ºçÊ§J<Æ¿&~Nu¼ãÙµ¢.UÇä(qQô^ö·%!É
@@ -3217,748 +138,4 @@ KÙ:KµºKí{K]ûK£[KÚKóKÓ½R×¿ÿ'P^j9TîçmóþL¿_o©×hÙtÙ
 Ái;ªäÀ%n= =M+W= ÓÖc[aS
 FÁð]NôÝ'= qr(¶ù¤nü«òÿ¿d&ÿÈõT4Þ=}z|ö ¿OW×SMtdH.ÏãRX&§o3ØÜXÍ^ÊMí£W´iâ]NüOå£S£Å·ç÷­ Ý§½GÑUy¹¦ß§/6P0(Cúýb"þ¥°VÙÄá£ÓÙ@¾YýòD{òÃv?EP©=MBé­\Ä½YäýRò	øfâëEEf¼D+gC×úÇ±GÅÿ±Ç?TzÙ¡±ÏÁÕ¯¦ðvZmT}3xËz×cºrÑM=Mc-É©Ô7½wæc§Î»cû¾yfÙWòÆÝÔc¥³ôØf«Äñ·9ø%­g:y^+{U]¤þ[&fÓÏYë«Gªõ¹¦Öðþ¬moÛø?/ÛS.[S9ÛùC/û2²Y£ÎÑ%/sy ¢×ÌùJ­W6Oí\g0^JùêßÏ0í[Ü'ÏÔ>À-¿[ÔW?Y]±ØÙÃî<~ÎëR~Ìf¾Z/×¼_á¾Þê+îoÐñ{Þ\e3K%©¹§íB¹§(c=}ËÈ·SzÔnf§èx}o\9öf|%Ýå¥~©IÇüñY8}Ffú@Rú1éþ3÷ËótQøvû|³Îaá,Óé>BG6Òê}ÃJ|¶=} °öf6õk¶ÌºHgNjÒ{æ¾M;9·é§WèO±Ä3ÒËÒyt	;ù´à©a|Ó^!ÝøûÂÄ
 (VV¸ÇÙcÏ>yoçzÃvòG{3Þ£½c×ôíÅé;°OÛGØ<wÜW>	rU]q­{û'ùÝír{*øï?t-ígùWÿ&§]m}×ût¥Ë~ß&>&Õv!b#ÅÌq¢µ|jÍüùÉ^Æ&ôþ~sIµ"]d)uâ´ºvk	Å\<Íÿ­öê½Â
-ïBçÏ§mÙIólÜoëVb¦¯éWÇû3` });
-  var imports = {
-    "a": wasmImports
-  };
-  this.setModule = (data3) => {
-    WASMAudioDecoderCommon2.setModule(EmscriptenWASM2, data3);
-  };
-  this.getModule = () => WASMAudioDecoderCommon2.getModule(EmscriptenWASM2);
-  this.instantiate = () => {
-    this.getModule().then((wasm) => WebAssembly.instantiate(wasm, imports)).then((instance) => {
-      const wasmExports = instance.exports;
-      assignWasmExports(wasmExports);
-      wasmMemory = wasmExports["l"];
-      updateMemoryViews();
-      initRuntime(wasmExports);
-      ready();
-    });
-    this.ready = new Promise((resolve) => {
-      ready = resolve;
-    }).then(() => {
-      this.HEAP = wasmMemory.buffer;
-      this.malloc = _malloc;
-      this.free = _free;
-      this.create_decoder = _create_decoder;
-      this.send_setup = _send_setup;
-      this.init_dsp = _init_dsp;
-      this.decode_packets = _decode_packets;
-      this.destroy_decoder = _destroy_decoder;
-    });
-    return this;
-  };
-}
-
-// ../../node_modules/@wasm-audio-decoders/ogg-vorbis/src/OggVorbisDecoder.js
-function Decoder() {
-  this._init = () => {
-    return new this._WASMAudioDecoderCommon().instantiate(this._EmscriptenWASM, this._module).then((common) => {
-      this._common = common;
-      this._input = this._common.allocateTypedArray(
-        this._inputSize,
-        Uint8Array
-      );
-      this._firstPage = true;
-      this._inputLen = this._common.allocateTypedArray(1, Uint32Array);
-      this._outputBufferPtr = this._common.allocateTypedArray(1, Uint32Array);
-      this._channels = this._common.allocateTypedArray(1, Uint32Array);
-      this._sampleRate = this._common.allocateTypedArray(1, Uint32Array);
-      this._samplesDecoded = this._common.allocateTypedArray(1, Uint32Array);
-      const maxErrors = 128 * 2;
-      this._errors = this._common.allocateTypedArray(maxErrors, Uint32Array);
-      this._errorsLength = this._common.allocateTypedArray(1, Int32Array);
-      this._frameNumber = 0;
-      this._inputBytes = 0;
-      this._outputSamples = 0;
-      this._decoder = this._common.wasm.create_decoder(
-        this._input.ptr,
-        this._inputLen.ptr,
-        this._outputBufferPtr.ptr,
-        this._channels.ptr,
-        this._sampleRate.ptr,
-        this._samplesDecoded.ptr,
-        this._errors.ptr,
-        this._errorsLength.ptr,
-        maxErrors
-      );
-    });
-  };
-  Object.defineProperty(this, "ready", {
-    enumerable: true,
-    get: () => this._ready
-  });
-  this.reset = () => {
-    this.free();
-    return this._init();
-  };
-  this.free = () => {
-    this._common.wasm.destroy_decoder(this._decoder);
-    this._common.free();
-  };
-  this.sendSetupHeader = (data3) => {
-    this._input.buf.set(data3);
-    this._inputLen.buf[0] = data3.length;
-    this._common.wasm.send_setup(this._decoder, this._firstPage);
-    this._firstPage = false;
-  };
-  this.initDsp = () => {
-    this._common.wasm.init_dsp(this._decoder);
-  };
-  this.decodePackets = (packets) => {
-    let outputBuffers = [], outputSamples = 0, errors = [];
-    for (let packetIdx = 0; packetIdx < packets.length; packetIdx++) {
-      const packet = packets[packetIdx];
-      this._input.buf.set(packet);
-      this._inputLen.buf[0] = packet.length;
-      this._common.wasm.decode_packets(this._decoder);
-      const samplesDecoded = this._samplesDecoded.buf[0];
-      const channels2 = [];
-      const outputBufferChannels = new Uint32Array(
-        this._common.wasm.HEAP,
-        this._outputBufferPtr.buf[0],
-        this._channels.buf[0]
-      );
-      for (let channel2 = 0; channel2 < this._channels.buf[0]; channel2++) {
-        const output = new Float32Array(samplesDecoded);
-        if (samplesDecoded) {
-          output.set(
-            new Float32Array(
-              this._common.wasm.HEAP,
-              outputBufferChannels[channel2],
-              samplesDecoded
-            )
-          );
-        }
-        channels2.push(output);
-      }
-      outputBuffers.push(channels2);
-      outputSamples += samplesDecoded;
-      this._frameNumber++;
-      this._inputBytes += packet.length;
-      this._outputSamples += samplesDecoded;
-      for (let i = 0; i < this._errorsLength.buf; i += 2) {
-        const errorDescription = this._common.codeToString(this._errors.buf[i]);
-        const functionName = this._common.codeToString(this._errors.buf[i + 1]);
-        errors.push({
-          message: errorDescription + " vorbis_synthesis" + functionName,
-          frameLength: packet.length,
-          frameNumber: this._frameNumber,
-          inputBytes: this._inputBytes,
-          outputSamples: this._outputSamples
-        });
-      }
-      this._errorsLength.buf[0] = 0;
-    }
-    return this._WASMAudioDecoderCommon.getDecodedAudioMultiChannel(
-      errors,
-      outputBuffers,
-      this._channels.buf[0],
-      outputSamples,
-      this._sampleRate.buf[0],
-      16
-    );
-  };
-  this._isWebWorker = Decoder.isWebWorker;
-  this._WASMAudioDecoderCommon = Decoder.WASMAudioDecoderCommon || WASMAudioDecoderCommon;
-  this._EmscriptenWASM = Decoder.EmscriptenWASM || EmscriptenWASM2;
-  this._module = Decoder.module;
-  this._inputSize = 128 * 1024;
-  this._ready = this._init();
-  return this;
-}
-var setDecoderClass = /* @__PURE__ */ Symbol();
-var OggVorbisDecoder = class {
-  constructor() {
-    this._onCodec = (codec2) => {
-      if (codec2 !== "vorbis")
-        throw new Error(
-          "@wasm-audio-decoders/ogg-vorbis does not support this codec " + codec2
-        );
-    };
-    new WASMAudioDecoderCommon();
-    this._init();
-    this._ready = this[setDecoderClass](Decoder);
-  }
-  _init() {
-    this._vorbisSetupInProgress = true;
-    this._totalSamplesDecoded = 0;
-    this._codecParser = new codec_parser_default("audio/ogg", {
-      onCodec: this._onCodec,
-      enableFrameCRC32: false
-    });
-  }
-  async [setDecoderClass](decoderClass) {
-    if (this._decoder) {
-      const oldDecoder = this._decoder;
-      await oldDecoder.ready.then(() => oldDecoder.free());
-    }
-    this._decoder = new decoderClass();
-    return this._decoder.ready;
-  }
-  get ready() {
-    return this._ready;
-  }
-  async reset() {
-    this._init();
-    return this._decoder.reset();
-  }
-  free() {
-    this._decoder.free();
-  }
-  async decodeOggPages(oggPages) {
-    const packets = [];
-    for (let i = 0; i < oggPages.length; i++) {
-      const oggPage2 = oggPages[i];
-      if (this._vorbisSetupInProgress) {
-        if (oggPage2[data2][0] === 1) {
-          this._decoder.sendSetupHeader(oggPage2[data2]);
-        }
-        if (oggPage2[codecFrames2].length) {
-          const headerData = oggPage2[codecFrames2][0][header2];
-          this._decoder.sendSetupHeader(headerData[vorbisSetup2]);
-          this._decoder.initDsp();
-          this._vorbisSetupInProgress = false;
-        }
-      }
-      packets.push(...oggPage2[codecFrames2].map((f) => f[data2]));
-    }
-    const decoded = await this._decoder.decodePackets(packets);
-    this._totalSamplesDecoded += decoded.samplesDecoded;
-    const oggPage = oggPages[oggPages.length - 1];
-    if (oggPage && oggPage[isLastPage2]) {
-      const samplesToTrim = this._totalSamplesDecoded - oggPage[totalSamples2];
-      if (samplesToTrim > 0) {
-        for (let i = 0; i < decoded.channelData.length; i++)
-          decoded.channelData[i] = decoded.channelData[i].subarray(
-            0,
-            decoded.samplesDecoded - samplesToTrim
-          );
-        decoded.samplesDecoded -= samplesToTrim;
-        this._totalSamplesDecoded -= samplesToTrim;
-      }
-    }
-    return decoded;
-  }
-  async decode(vorbisData) {
-    return this.decodeOggPages([...this._codecParser.parseChunk(vorbisData)]);
-  }
-  async flush() {
-    const decoded = await this.decodeOggPages([...this._codecParser.flush()]);
-    await this.reset();
-    return decoded;
-  }
-  async decodeFile(vorbisData) {
-    const decoded = await this.decodeOggPages([
-      ...this._codecParser.parseAll(vorbisData)
-    ]);
-    await this.reset();
-    return decoded;
-  }
-};
-
-// ../../node_modules/@wasm-audio-decoders/ogg-vorbis/src/OggVorbisDecoderWebWorker.js
-var DecoderWorker = class extends WASMAudioDecoderWorker {
-  constructor(options) {
-    super(options, "ogg-vorbis-decoder", Decoder, EmscriptenWASM2);
-  }
-  async sendSetupHeader(data3) {
-    return this.postToDecoder("sendSetupHeader", data3);
-  }
-  async initDsp() {
-    return this.postToDecoder("initDsp");
-  }
-  async decodePackets(packets) {
-    return this.postToDecoder("decodePackets", packets);
-  }
-};
-var OggVorbisDecoderWebWorker = class extends OggVorbisDecoder {
-  constructor() {
-    super();
-    this._ready = super[setDecoderClass](DecoderWorker);
-  }
-  async free() {
-    await this._decoder.free();
-  }
-  terminate() {
-    this._decoder.terminate();
-  }
-};
-
-// ../../node_modules/@wasm-audio-decoders/ogg-vorbis/index.js
-assignNames(OggVorbisDecoder, "OggVorbisDecoder");
-assignNames(OggVorbisDecoderWebWorker, "OggVorbisDecoderWebWorker");
-
-// src/decode-webm.src.js
-var EMPTY = Object.freeze({ channelData: [], sampleRate: 0 });
-var ID_EBML = 440786851;
-var ID_SEGMENT = 408125543;
-var ID_TRACKS = 374648427;
-var ID_TRACK_ENTRY = 174;
-var ID_TRACK_NUMBER = 215;
-var ID_TRACK_TYPE = 131;
-var ID_CODEC_ID = 134;
-var ID_CODEC_PRIVATE = 25506;
-var ID_AUDIO = 225;
-var ID_SAMPLE_RATE = 181;
-var ID_CHANNELS = 159;
-var ID_CODEC_DELAY = 22186;
-var ID_SEEK_PRE_ROLL = 22203;
-var ID_CLUSTER = 524531317;
-var ID_SIMPLE_BLOCK = 163;
-var ID_BLOCK_GROUP = 160;
-var ID_BLOCK = 161;
-var MASTER = /* @__PURE__ */ new Set([
-  ID_EBML,
-  ID_SEGMENT,
-  ID_TRACKS,
-  ID_AUDIO,
-  ID_CLUSTER,
-  ID_BLOCK_GROUP
-]);
-var UNKNOWN_SIZE = [127, 16383, 2097151, 268435455, 34359738367, 4398046511103, 562949953421311, 72057594037927940];
-function readId(b, o) {
-  if (o >= b.length) return null;
-  let first = b[o], len = 1, mask = 128;
-  while (len <= 4 && !(first & mask)) {
-    len++;
-    mask >>= 1;
-  }
-  if (len > 4) return null;
-  let val = first;
-  for (let i = 1; i < len; i++) {
-    if (o + i >= b.length) return null;
-    val = val * 256 + b[o + i];
-  }
-  return { val, len };
-}
-function readSize(b, o) {
-  if (o >= b.length) return null;
-  let first = b[o], len = 1, mask = 128;
-  while (len <= 8 && !(first & mask)) {
-    len++;
-    mask >>= 1;
-  }
-  if (len > 8) return null;
-  let val = first & mask - 1;
-  for (let i = 1; i < len; i++) {
-    if (o + i >= b.length) return null;
-    val = val * 256 + b[o + i];
-  }
-  if (val === UNKNOWN_SIZE[len - 1]) return { val: -1, len };
-  return { val, len };
-}
-function readUint(b, o, n) {
-  let v = 0;
-  for (let i = 0; i < n; i++) v = v * 256 + b[o + i];
-  return v;
-}
-function readFloat(b, o, n) {
-  let dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
-  if (n === 4) return dv.getFloat32(o);
-  if (n === 8) return dv.getFloat64(o);
-  return 0;
-}
-function readStr(b, o, n) {
-  let s = "";
-  for (let i = 0; i < n; i++) {
-    if (b[o + i] === 0) break;
-    s += String.fromCharCode(b[o + i]);
-  }
-  return s;
-}
-function parseOpusHead(d) {
-  if (!d || d.length < 19) return null;
-  if (readStr(d, 0, 8) !== "OpusHead") return null;
-  if (d[8] > 15) return null;
-  let channels2 = d[9];
-  let preSkip2 = d[10] | d[11] << 8;
-  let sampleRate2 = d[12] | d[13] << 8 | d[14] << 16 | d[15] << 24;
-  let mappingFamily = d[18];
-  let streamCount2 = 1, coupledStreamCount2 = channels2 > 1 ? 1 : 0;
-  let channelMappingTable2 = channels2 === 1 ? [0] : [0, 1];
-  if (mappingFamily > 0 && d.length >= 21 + channels2) {
-    streamCount2 = d[19];
-    coupledStreamCount2 = d[20];
-    channelMappingTable2 = Array.from(d.subarray(21, 21 + channels2));
-  }
-  return { channels: channels2, preSkip: preSkip2, sampleRate: sampleRate2, mappingFamily, streamCount: streamCount2, coupledStreamCount: coupledStreamCount2, channelMappingTable: channelMappingTable2 };
-}
-function parseWebm(buf) {
-  let b = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
-  if (b.length < 4) throw Error("Not a WebM file");
-  let id = readId(b, 0);
-  if (!id || id.val !== ID_EBML) throw Error("Not a WebM file");
-  let entries = [];
-  let curEntry = null;
-  let audioTrack = null;
-  let frames = [];
-  function walk(start, end) {
-    let pos = start;
-    while (pos < end) {
-      let eid = readId(b, pos);
-      if (!eid) break;
-      let siz = readSize(b, pos + eid.len);
-      if (!siz) break;
-      let dataOff = pos + eid.len + siz.len;
-      let dataLen = siz.val;
-      let elemEnd = dataLen < 0 ? end : dataOff + dataLen;
-      if (elemEnd > end) elemEnd = end;
-      if (dataOff > end) break;
-      let elemId = eid.val;
-      if (elemId === ID_TRACK_ENTRY) {
-        curEntry = { number: 0, type: 0, codec: "", sampleRate: 48e3, channels: 2, codecPrivate: null, codecDelay: 0, seekPreRoll: 0 };
-        walk(dataOff, elemEnd);
-        entries.push(curEntry);
-        if (!audioTrack && curEntry.type === 2 && curEntry.codec) audioTrack = curEntry;
-        curEntry = null;
-      } else if (MASTER.has(elemId)) {
-        walk(dataOff, elemEnd);
-      } else if (curEntry) {
-        if (elemId === ID_TRACK_NUMBER) curEntry.number = readUint(b, dataOff, dataLen);
-        else if (elemId === ID_TRACK_TYPE) curEntry.type = readUint(b, dataOff, dataLen);
-        else if (elemId === ID_CODEC_ID) curEntry.codec = readStr(b, dataOff, dataLen);
-        else if (elemId === ID_CODEC_PRIVATE) curEntry.codecPrivate = b.slice(dataOff, dataOff + dataLen);
-        else if (elemId === ID_SAMPLE_RATE && dataLen > 0) curEntry.sampleRate = readFloat(b, dataOff, dataLen);
-        else if (elemId === ID_CHANNELS && dataLen > 0) curEntry.channels = readUint(b, dataOff, dataLen);
-        else if (elemId === ID_CODEC_DELAY && dataLen > 0) curEntry.codecDelay = readUint(b, dataOff, dataLen);
-        else if (elemId === ID_SEEK_PRE_ROLL && dataLen > 0) curEntry.seekPreRoll = readUint(b, dataOff, dataLen);
-      } else if ((elemId === ID_SIMPLE_BLOCK || elemId === ID_BLOCK) && audioTrack && dataLen > 0) {
-        let bp = dataOff;
-        let tn = readSize(b, bp);
-        if (tn && tn.val === audioTrack.number) {
-          bp += tn.len + 3;
-          if (bp < dataOff + dataLen) {
-            frames.push(b.subarray(bp, dataOff + dataLen));
-          }
-        }
-      }
-      pos = elemEnd;
-    }
-  }
-  walk(0, b.length);
-  if (!audioTrack) throw Error("No audio track found in WebM");
-  return {
-    codec: audioTrack.codec,
-    trackNum: audioTrack.number,
-    sampleRate: audioTrack.sampleRate,
-    channels: audioTrack.channels,
-    codecPrivate: audioTrack.codecPrivate,
-    codecDelay: audioTrack.codecDelay,
-    seekPreRoll: audioTrack.seekPreRoll,
-    frames
-  };
-}
-function parseVorbisPrivate(d) {
-  if (!d || d.length < 3 || d[0] !== 2) return null;
-  let pos = 1, sizes = [];
-  for (let i = 0; i < 2; i++) {
-    let sz = 0;
-    while (pos < d.length && d[pos] === 255) {
-      sz += 255;
-      pos++;
-    }
-    if (pos < d.length) {
-      sz += d[pos];
-      pos++;
-    }
-    sizes.push(sz);
-  }
-  let h1 = d.slice(pos, pos + sizes[0]);
-  let h2 = d.slice(pos + sizes[0], pos + sizes[0] + sizes[1]);
-  let h3 = d.slice(pos + sizes[0] + sizes[1]);
-  if (h1[0] !== 1 || h2[0] !== 3 || h3[0] !== 5) return null;
-  return [h1, h2, h3];
-}
-var OGG_CRC = new Uint32Array(256);
-for (let i = 0; i < 256; i++) {
-  let r = i << 24;
-  for (let j = 0; j < 8; j++) r = r << 1 ^ (r >>> 31) * 79764919;
-  OGG_CRC[i] = r >>> 0;
-}
-function oggCrc(buf) {
-  let c = 0;
-  for (let i = 0; i < buf.length; i++) c = (c << 8 ^ OGG_CRC[(c >>> 24 ^ buf[i]) & 255]) >>> 0;
-  return c;
-}
-function makeOggPage(packets, granule, serial, seq, flags) {
-  let segs = [];
-  for (let p of packets) {
-    let len = p.length;
-    while (len >= 255) {
-      segs.push(255);
-      len -= 255;
-    }
-    segs.push(len);
-  }
-  let bodyLen = 0;
-  for (let p of packets) bodyLen += p.length;
-  let headerLen = 27 + segs.length;
-  let page2 = new Uint8Array(headerLen + bodyLen);
-  let dv = new DataView(page2.buffer);
-  page2[0] = 79;
-  page2[1] = 103;
-  page2[2] = 103;
-  page2[3] = 83;
-  page2[4] = 0;
-  page2[5] = flags;
-  if (granule < 0) {
-    dv.setUint32(6, 4294967295, true);
-    dv.setUint32(10, 4294967295, true);
-  } else {
-    dv.setUint32(6, granule >>> 0, true);
-    dv.setUint32(10, granule / 4294967296 >>> 0, true);
-  }
-  dv.setUint32(14, serial, true);
-  dv.setUint32(18, seq, true);
-  dv.setUint32(22, 0, true);
-  page2[26] = segs.length;
-  for (let i = 0; i < segs.length; i++) page2[27 + i] = segs[i];
-  let off2 = headerLen;
-  for (let p of packets) {
-    page2.set(p, off2);
-    off2 += p.length;
-  }
-  dv.setUint32(22, oggCrc(page2), true);
-  return page2;
-}
-function framesToOgg(frames, serial, seqRef) {
-  let pages = [], i = 0;
-  while (i < frames.length) {
-    let pkt = [], segCount = 0;
-    while (i < frames.length) {
-      let needed = Math.floor(frames[i].length / 255) + 1;
-      if (segCount + needed > 255) break;
-      pkt.push(frames[i]);
-      segCount += needed;
-      i++;
-    }
-    pages.push(makeOggPage(pkt, -1, serial, seqRef.n++, 0));
-  }
-  let totalLen = 0;
-  for (let p of pages) totalLen += p.length;
-  return concat(pages, totalLen);
-}
-async function createVorbisStream(info) {
-  let headers = parseVorbisPrivate(info.codecPrivate);
-  if (!headers) throw Error("Invalid Vorbis CodecPrivate");
-  let dec = new OggVorbisDecoder();
-  await dec.ready;
-  let serial = 1448038978, seq = { n: 0 };
-  let bos = makeOggPage([headers[0]], 0, serial, seq.n++, 2);
-  let hdr = makeOggPage([headers[1], headers[2]], 0, serial, seq.n++, 0);
-  await dec.decode(concat([bos, hdr], bos.length + hdr.length));
-  return { dec, serial, seq };
-}
-async function decode(src) {
-  if (!src || typeof src === "string" || !(src.buffer || src.byteLength != null || src.length))
-    throw TypeError("Expected ArrayBuffer or Uint8Array");
-  let buf = src instanceof Uint8Array ? src : new Uint8Array(src.buffer || src);
-  if (!buf.length) throw Error("Not a WebM file");
-  parseWebm(buf);
-  let dec = await decoder();
-  try {
-    let result = await dec.decode(buf);
-    let flushed = await dec.flush();
-    return merge(result, flushed);
-  } finally {
-    dec.free();
-  }
-}
-async function decoder() {
-  let freed = false;
-  let codecDec = null, info = null;
-  let accum = [], accumLen = 0;
-  let scanner = null;
-  return {
-    async decode(data3) {
-      if (freed) throw Error("Decoder already freed");
-      if (!data3?.length) return EMPTY;
-      let chunk = data3 instanceof Uint8Array ? data3 : new Uint8Array(data3);
-      if (!info) {
-        accum.push(chunk);
-        accumLen += chunk.length;
-        let buf = accum.length === 1 ? accum[0] : concat(accum, accumLen);
-        try {
-          info = parseWebm(buf);
-        } catch {
-          if (accumLen < 8192) return EMPTY;
-          throw Error("Not a WebM file");
-        }
-        if (info.codec === "A_VORBIS") {
-          codecDec = await createVorbisStream(info);
-        } else if (info.codec === "A_OPUS") {
-          codecDec = await createOpusStream(info);
-        } else {
-          throw Error("Unsupported WebM codec: " + info.codec);
-        }
-        scanner = new EBMLScanner(info.trackNum);
-        scanner.init(buf);
-        accum = [];
-        accumLen = 0;
-        if (info.frames.length) {
-          if (info.codec === "A_VORBIS") {
-            let ogg = framesToOgg(info.frames, codecDec.serial, codecDec.seq);
-            let result3 = await codecDec.dec.decode(ogg);
-            return normResult(result3);
-          }
-          let result2 = codecDec.dec.decodeFrames(info.frames);
-          return normResult(result2);
-        }
-        return EMPTY;
-      }
-      let frames = scanner.feed(chunk);
-      if (!frames.length) return EMPTY;
-      if (info.codec === "A_VORBIS") {
-        let ogg = framesToOgg(frames, codecDec.serial, codecDec.seq);
-        let result2 = await codecDec.dec.decode(ogg);
-        return normResult(result2);
-      }
-      let result = codecDec.dec.decodeFrames(frames);
-      return normResult(result);
-    },
-    async flush() {
-      if (freed) return EMPTY;
-      if (codecDec) {
-        let result = await codecDec.dec.flush?.();
-        let r = normResult(result);
-        codecDec.dec.free?.();
-        codecDec = null;
-        freed = true;
-        scanner = null;
-        return r;
-      }
-      freed = true;
-      scanner = null;
-      return EMPTY;
-    },
-    free() {
-      if (freed) return;
-      freed = true;
-      if (codecDec) {
-        codecDec.dec.free?.();
-        codecDec = null;
-      }
-      scanner = null;
-    }
-  };
-}
-var EBMLScanner = class {
-  constructor(trackNum) {
-    this.trackNum = trackNum;
-    this.left = null;
-  }
-  // Walk initial buffer to establish position (frames already decoded by parseWebm)
-  init(buf) {
-    this.left = null;
-    let pos = 0;
-    while (pos < buf.length) {
-      let eid = readId(buf, pos);
-      if (!eid) break;
-      let siz = readSize(buf, pos + eid.len);
-      if (!siz) break;
-      let dataOff = pos + eid.len + siz.len;
-      let id = eid.val, dataLen = siz.val;
-      if (id === ID_SEGMENT || id === ID_CLUSTER || id === ID_BLOCK_GROUP) {
-        pos = dataOff;
-        continue;
-      }
-      if (dataLen < 0) break;
-      if (dataOff + dataLen > buf.length) break;
-      pos = dataOff + dataLen;
-    }
-    if (pos < buf.length) this.left = buf.subarray(pos).slice();
-  }
-  // Feed new data, return extracted audio frames
-  feed(chunk) {
-    let buf = chunk;
-    if (this.left) {
-      buf = new Uint8Array(this.left.length + chunk.length);
-      buf.set(this.left);
-      buf.set(chunk, this.left.length);
-      this.left = null;
-    }
-    let frames = [], pos = 0;
-    while (pos < buf.length) {
-      let eid = readId(buf, pos);
-      if (!eid) break;
-      let siz = readSize(buf, pos + eid.len);
-      if (!siz) break;
-      let dataOff = pos + eid.len + siz.len;
-      let id = eid.val, dataLen = siz.val;
-      if (id === ID_SEGMENT || id === ID_CLUSTER || id === ID_BLOCK_GROUP) {
-        pos = dataOff;
-        continue;
-      }
-      if (dataLen < 0) break;
-      if (dataOff + dataLen > buf.length) break;
-      if ((id === ID_SIMPLE_BLOCK || id === ID_BLOCK) && dataLen > 4) {
-        let bp = dataOff;
-        let tn = readSize(buf, bp);
-        if (tn && tn.val === this.trackNum) {
-          bp += tn.len + 3;
-          if (bp < dataOff + dataLen) frames.push(buf.slice(bp, dataOff + dataLen));
-        }
-      }
-      pos = dataOff + dataLen;
-    }
-    if (pos < buf.length) this.left = buf.subarray(pos).slice();
-    return frames;
-  }
-};
-async function createOpusStream(info) {
-  let head = info.codecPrivate ? parseOpusHead(info.codecPrivate) : null;
-  let channels2 = head?.channels || info.channels || 2;
-  let preSkip2 = head?.preSkip || 0;
-  if (!preSkip2 && info.codecDelay) preSkip2 = Math.round(info.codecDelay / 1e9 * 48e3);
-  let opts = { channels: channels2, sampleRate: 48e3, preSkip: preSkip2 };
-  if (head && head.mappingFamily > 0) {
-    opts.streamCount = head.streamCount;
-    opts.coupledStreamCount = head.coupledStreamCount;
-    opts.channelMappingTable = head.channelMappingTable;
-  } else if (channels2 === 1) {
-    opts.streamCount = 1;
-    opts.coupledStreamCount = 0;
-    opts.channelMappingTable = [0];
-  } else if (channels2 === 2) {
-    opts.streamCount = 1;
-    opts.coupledStreamCount = 1;
-    opts.channelMappingTable = [0, 1];
-  }
-  let dec = new OpusDecoder(opts);
-  await dec.ready;
-  return { dec, channels: channels2 };
-}
-function normResult(result) {
-  if (!result?.channelData?.length) return EMPTY;
-  let { channelData, samplesDecoded, sampleRate: sampleRate2 } = result;
-  if (samplesDecoded != null && samplesDecoded < channelData[0].length)
-    channelData = channelData.map((ch) => ch.subarray(0, samplesDecoded));
-  if (!channelData[0]?.length) return EMPTY;
-  return { channelData, sampleRate: sampleRate2 };
-}
-function concat(parts, totalLen) {
-  let buf = new Uint8Array(totalLen), off2 = 0;
-  for (let c of parts) {
-    buf.set(c, off2);
-    off2 += c.length;
-  }
-  return buf;
-}
-function merge(a, b) {
-  if (!b?.channelData?.length) return a;
-  if (!a?.channelData?.length) return b;
-  return {
-    channelData: a.channelData.map((ch, i) => {
-      let m = new Float32Array(ch.length + b.channelData[i].length);
-      m.set(ch);
-      m.set(b.channelData[i], ch.length);
-      return m;
-    }),
-    sampleRate: a.sampleRate
-  };
-}
-export {
-  decoder,
-  decode as default
-};
+ïBçÏ§mÙIólÜoëVb¦¯éWÇû3`});var ys={a:gs};this.setModule=p=>{t.setModule(Fe,p)},this.getModule=()=>t.getModule(Fe),this.instantiate=()=>(this.getModule().then(p=>WebAssembly.instantiate(p,ys)).then(p=>{let V=p.exports;vs(V),b=V.l,g(),Hs(V),i()}),this.ready=new Promise(p=>{i=p}).then(()=>{this.HEAP=b.buffer,this.malloc=Yr,this.free=ri,this.create_decoder=jr,this.send_setup=$r,this.init_dsp=Zr,this.decode_packets=ei,this.destroy_decoder=ti}),this)}function Ae(){return this._init=()=>new this._WASMAudioDecoderCommon().instantiate(this._EmscriptenWASM,this._module).then(t=>{this._common=t,this._input=this._common.allocateTypedArray(this._inputSize,Uint8Array),this._firstPage=!0,this._inputLen=this._common.allocateTypedArray(1,Uint32Array),this._outputBufferPtr=this._common.allocateTypedArray(1,Uint32Array),this._channels=this._common.allocateTypedArray(1,Uint32Array),this._sampleRate=this._common.allocateTypedArray(1,Uint32Array),this._samplesDecoded=this._common.allocateTypedArray(1,Uint32Array);let e=256;this._errors=this._common.allocateTypedArray(e,Uint32Array),this._errorsLength=this._common.allocateTypedArray(1,Int32Array),this._frameNumber=0,this._inputBytes=0,this._outputSamples=0,this._decoder=this._common.wasm.create_decoder(this._input.ptr,this._inputLen.ptr,this._outputBufferPtr.ptr,this._channels.ptr,this._sampleRate.ptr,this._samplesDecoded.ptr,this._errors.ptr,this._errorsLength.ptr,e)}),Object.defineProperty(this,"ready",{enumerable:!0,get:()=>this._ready}),this.reset=()=>(this.free(),this._init()),this.free=()=>{this._common.wasm.destroy_decoder(this._decoder),this._common.free()},this.sendSetupHeader=t=>{this._input.buf.set(t),this._inputLen.buf[0]=t.length,this._common.wasm.send_setup(this._decoder,this._firstPage),this._firstPage=!1},this.initDsp=()=>{this._common.wasm.init_dsp(this._decoder)},this.decodePackets=t=>{let e=[],i=0,n=[];for(let r=0;r<t.length;r++){let s=t[r];this._input.buf.set(s),this._inputLen.buf[0]=s.length,this._common.wasm.decode_packets(this._decoder);let a=this._samplesDecoded.buf[0],o=[],h=new Uint32Array(this._common.wasm.HEAP,this._outputBufferPtr.buf[0],this._channels.buf[0]);for(let l=0;l<this._channels.buf[0];l++){let d=new Float32Array(a);a&&d.set(new Float32Array(this._common.wasm.HEAP,h[l],a)),o.push(d)}e.push(o),i+=a,this._frameNumber++,this._inputBytes+=s.length,this._outputSamples+=a;for(let l=0;l<this._errorsLength.buf;l+=2){let d=this._common.codeToString(this._errors.buf[l]),c=this._common.codeToString(this._errors.buf[l+1]);n.push({message:d+" vorbis_synthesis"+c,frameLength:s.length,frameNumber:this._frameNumber,inputBytes:this._inputBytes,outputSamples:this._outputSamples})}this._errorsLength.buf[0]=0}return this._WASMAudioDecoderCommon.getDecodedAudioMultiChannel(n,e,this._channels.buf[0],i,this._sampleRate.buf[0],16)},this._isWebWorker=Ae.isWebWorker,this._WASMAudioDecoderCommon=Ae.WASMAudioDecoderCommon||O,this._EmscriptenWASM=Ae.EmscriptenWASM||Fe,this._module=Ae.module,this._inputSize=128*1024,this._ready=this._init(),this}var Er=Symbol(),Gr=class{constructor(){this._onCodec=t=>{if(t!=="vorbis")throw new Error("@wasm-audio-decoders/ogg-vorbis does not support this codec "+t)},new O,this._init(),this._ready=this[Er](Ae)}_init(){this._vorbisSetupInProgress=!0,this._totalSamplesDecoded=0,this._codecParser=new Xi("audio/ogg",{onCodec:this._onCodec,enableFrameCRC32:!1})}async[Er](t){if(this._decoder){let e=this._decoder;await e.ready.then(()=>e.free())}return this._decoder=new t,this._decoder.ready}get ready(){return this._ready}async reset(){return this._init(),this._decoder.reset()}free(){this._decoder.free()}async decodeOggPages(t){let e=[];for(let r=0;r<t.length;r++){let s=t[r];if(this._vorbisSetupInProgress&&(s[xe][0]===1&&this._decoder.sendSetupHeader(s[xe]),s[Re].length)){let a=s[Re][0][Ji];this._decoder.sendSetupHeader(a[Yi]),this._decoder.initDsp(),this._vorbisSetupInProgress=!1}e.push(...s[Re].map(a=>a[xe]))}let i=await this._decoder.decodePackets(e);this._totalSamplesDecoded+=i.samplesDecoded;let n=t[t.length-1];if(n&&n[ji]){let r=this._totalSamplesDecoded-n[$i];if(r>0){for(let s=0;s<i.channelData.length;s++)i.channelData[s]=i.channelData[s].subarray(0,i.samplesDecoded-r);i.samplesDecoded-=r,this._totalSamplesDecoded-=r}}return i}async decode(t){return this.decodeOggPages([...this._codecParser.parseChunk(t)])}async flush(){let t=await this.decodeOggPages([...this._codecParser.flush()]);return await this.reset(),t}async decodeFile(t){let e=await this.decodeOggPages([...this._codecParser.parseAll(t)]);return await this.reset(),e}},vn=class extends Is{constructor(t){super(t,"ogg-vorbis-decoder",Ae,Fe)}async sendSetupHeader(t){return this.postToDecoder("sendSetupHeader",t)}async initDsp(){return this.postToDecoder("initDsp")}async decodePackets(t){return this.postToDecoder("decodePackets",t)}},Hn=class extends Gr{constructor(){super(),this._ready=super[Er](vn)}async free(){await this._decoder.free()}terminate(){this._decoder.terminate()}};vi(Gr,"OggVorbisDecoder");vi(Hn,"OggVorbisDecoderWebWorker");var Ke=Object.freeze({channelData:Object.freeze([]),sampleRate:0});async function Zi(){let t=new Gr;await t.ready;let e=t._decoder;if(typeof e?.sendSetupHeader!="function"||typeof e.initDsp!="function"||typeof e.decodePackets!="function")throw t.free(),Error("Unsupported @wasm-audio-decoders/ogg-vorbis internals");let i=new Xi("audio/ogg",{onCodec:l=>{if(l!=="vorbis")throw Error("@audio/decode-vorbis does not support this codec "+l)},enableFrameCRC32:!1}),n=!0,r=0,s=!1,a=!1,o=l=>{if(!l.length)return null;let d=[];for(let w of l){if(n&&(w[xe][0]===1&&e.sendSetupHeader(w[xe]),w[Re].length)){let b=w[Re][0][Ji][Yi];e.sendSetupHeader(b),e.initDsp(),n=!1}d.push(...w[Re].map(b=>b[xe]))}let c=e.decodePackets(d);r+=c.samplesDecoded;let f=l[l.length-1];if(f?.[ji]){let w=r-f[$i];if(w>0){let b=Math.max(0,c.samplesDecoded-w);for(let g=0;g<c.channelData.length;g++)c.channelData[g]=c.channelData[g].subarray(0,b);r-=c.samplesDecoded-b,c.samplesDecoded=b}}return c};t.decode=l=>{if(a)throw Error("Decoder already freed");if(s)throw Error("Decoder already flushed");if(!l)return Ke;let d=l instanceof Uint8Array?l:new Uint8Array(l);if(!d.length)return Ke;let c=o([...i.parseChunk(d)]);return c?.channelData?.length?c:Ke},t.flush=()=>{if(a||s)return Ke;s=!0;try{let l=o([...i.flush()]);return l?.channelData?.length?l:Ke}finally{i=null}};let h=t.free.bind(t);return t.free=()=>{a||(a=!0,i=null,h())},t}var z=Object.freeze({channelData:[],sampleRate:0}),ts=440786851,rs=408125543,yn=374648427,Sn=174,bn=215,Mn=131,wn=134,In=25506,Cn=225,Fn=181,An=159,Pn=22186,Dn=22203,Xr=524531317,En=163,is=160,Un=161,Ln=new Set([ts,rs,yn,Cn,Xr,is]),On=[127,16383,2097151,268435455,34359738367,4398046511103,562949953421311,72057594037927940];function qr(t,e){if(e>=t.length)return null;let i=t[e],n=1,r=128;for(;n<=4&&!(i&r);)n++,r>>=1;if(n>4)return null;let s=i;for(let a=1;a<n;a++){if(e+a>=t.length)return null;s=s*256+t[e+a]}return{val:s,len:n}}function Wr(t,e){if(e>=t.length)return null;let i=t[e],n=1,r=128;for(;n<=8&&!(i&r);)n++,r>>=1;if(n>8)return null;let s=i&r-1;for(let a=1;a<n;a++){if(e+a>=t.length)return null;s=s*256+t[e+a]}return s===On[n-1]?{val:-1,len:n}:{val:s,len:n}}function at(t,e,i){let n=0;for(let r=0;r<i;r++)n=n*256+t[e+r];return n}function Rn(t,e,i){let n=new DataView(t.buffer,t.byteOffset,t.byteLength);return i===4?n.getFloat32(e):i===8?n.getFloat64(e):0}function ss(t,e,i){let n="";for(let r=0;r<i&&t[e+r]!==0;r++)n+=String.fromCharCode(t[e+r]);return n}function xn(t){if(!t||t.length<19||ss(t,0,8)!=="OpusHead"||t[8]>15)return null;let e=t[9];if(!e)return null;let i=t[10]|t[11]<<8,n=t[12]|t[13]<<8|t[14]<<16|t[15]<<24,r=(t[16]|t[17]<<8)<<16>>16,s=t[18];if(s===0&&e>2)return null;let a=1,o=e>1?1:0,h=e===1?[0]:[0,1];if(s>0){if(t.length<21+e)return null;a=t[19],o=t[20],h=Array.from(t.subarray(21,21+e))}return{channels:e,preSkip:i,sampleRate:n,outputGain:r,mappingFamily:s,streamCount:a,coupledStreamCount:o,channelMappingTable:h}}function ns(t){let e=t instanceof Uint8Array?t:new Uint8Array(t);if(e.length<4)throw Error("Not a WebM file");let i=qr(e,0);if(!i||i.val!==ts)throw Error("Not a WebM file");let n=null,r=null;function s(a,o){let h=a;for(;h<o;){let l=qr(e,h);if(!l)break;let d=Wr(e,h+l.len);if(!d)break;let c=h+l.len+d.len,f=d.val,w=f>=0&&c+f<=o,b=f<0?o:Math.min(c+f,o);if(c>o)break;let g=l.val;g===Sn?(n={number:0,type:0,codec:"",sampleRate:48e3,channels:2,codecPrivate:null,codecDelay:0,seekPreRoll:0},s(c,b),!r&&n.type===2&&n.codec&&(r=n),n=null):g===Xr||(Ln.has(g)?s(c,b):n&&w&&(g===bn?n.number=at(e,c,f):g===Mn?n.type=at(e,c,f):g===wn?n.codec=ss(e,c,f):g===In?n.codecPrivate=e.slice(c,c+f):g===Fn&&f>0?n.sampleRate=Rn(e,c,f):g===An&&f>0?n.channels=at(e,c,f):g===Pn&&f>0?n.codecDelay=at(e,c,f):g===Dn&&f>0&&(n.seekPreRoll=at(e,c,f)))),h=b}}if(s(0,e.length),!r)throw Error("No audio track found in WebM");return{codec:r.codec,trackNum:r.number,sampleRate:r.sampleRate,channels:r.channels,codecPrivate:r.codecPrivate,codecDelay:r.codecDelay,seekPreRoll:r.seekPreRoll}}function kn(t){if(!t||t.length<3||t[0]!==2)return null;let e=1,i=[];for(let l=0;l<2;l++){let d=0;for(;e<t.length&&t[e]===255;)d+=255,e++;e<t.length&&(d+=t[e],e++),i.push(d)}let n=e+i[0],r=n+i[1];if(r>=t.length)return null;let s=t.slice(e,n),a=t.slice(n,r),o=t.slice(r),h=l=>l[1]===118&&l[2]===111&&l[3]===114&&l[4]===98&&l[5]===105&&l[6]===115;return s.length<30||a.length<7||o.length<7||s[0]!==1||a[0]!==3||o[0]!==5||!h(s)||!h(a)||!h(o)?null:[s,a,o]}var as=new Uint32Array(256);for(let t=0;t<256;t++){let e=t<<24;for(let i=0;i<8;i++)e=e<<1^(e>>>31)*79764919;as[t]=e>>>0}function Bn(t){let e=0;for(let i=0;i<t.length;i++)e=(e<<8^as[(e>>>24^t[i])&255])>>>0;return e}function Kr(t,e,i,n,r){let s=[];for(let c of t){let f=c.length;for(;f>=255;)s.push(255),f-=255;s.push(f)}let a=0;for(let c of t)a+=c.length;let o=27+s.length,h=new Uint8Array(o+a),l=new DataView(h.buffer);h[0]=79,h[1]=103,h[2]=103,h[3]=83,h[4]=0,h[5]=r,e<0?(l.setUint32(6,4294967295,!0),l.setUint32(10,4294967295,!0)):(l.setUint32(6,e>>>0,!0),l.setUint32(10,e/4294967296>>>0,!0)),l.setUint32(14,i,!0),l.setUint32(18,n,!0),l.setUint32(22,0,!0),h[26]=s.length;for(let c=0;c<s.length;c++)h[27+c]=s[c];let d=o;for(let c of t)h.set(c,d),d+=c.length;return l.setUint32(22,Bn(h),!0),h}function es(t,e,i){let n=[],r=0;for(;r<t.length;){let a=[],o=0;for(;r<t.length;){let h=Math.floor(t[r].length/255)+1;if(o+h>255)break;a.push(t[r]),o+=h,r++}n.push(Kr(a,-1,e,i.n++,0))}let s=0;for(let a of n)s+=a.length;return Jr(n,s)}function Nn(t,e){let i=1448038978,n={n:0},r=Kr([t[0]],0,i,n.n++,2),s=Kr([t[1],t[2]],0,i,n.n++,0);return e.decode(Jr([r,s],r.length+s.length)),{dec:e,serial:i,seq:n}}async function Tn(t){if(!t||typeof t=="string"||!(t.buffer||t.byteLength!=null||t.length))throw TypeError("Expected ArrayBuffer or Uint8Array");let e=t instanceof Uint8Array?t:new Uint8Array(t.buffer||t);if(!e.length)throw Error("Not a WebM file");ns(e);let i=await Vn();try{let n=i.decode(e),r=i.flush();return Gn(n,r)}finally{i.free()}}async function Vn(){let t=await Promise.allSettled([ni(),Zi()]),e=t.find(c=>c.status==="rejected");if(e){for(let c of t)c.status==="fulfilled"&&c.value.free();throw e.reason}let[i,n]=t.map(c=>c.value),r=!1,s=null,a=null,o=[],h=0,l=null,d=()=>{i?.free(),i=null,n?.free(),n=null};return{decode(c){if(r)throw Error("Decoder already freed");if(!c)return z;let f=c instanceof Uint8Array?c:new Uint8Array(c);if(!f.length)return z;if(!a){o.push(f),h+=f.length;let b=o.length===1?o[0]:Jr(o,h);try{a=ns(b)}catch{if(h<8192)return z;throw Error("Not a WebM file")}if(a.codec==="A_VORBIS"){if(!a.codecPrivate&&h<8192)return a=null,z;let m=kn(a.codecPrivate);if(!m)throw Error("Invalid Vorbis CodecPrivate");i.free(),i=null,s=Nn(m,n),n=null}else if(a.codec==="A_OPUS"){if(!a.codecPrivate&&h<8192)return a=null,z;let m=xn(a.codecPrivate);if(!m)throw Error("Invalid Opus CodecPrivate");n.free(),n=null,s=Qn(a,m,i),i=null}else throw d(),Error("Unsupported WebM codec: "+a.codec);l=new zr(a.trackNum);let g=l.feed(b);if(o=[],h=0,g.length){if(a.codec==="A_VORBIS"){let m=es(g,s.serial,s.seq);return ot(s.dec.decode(m))}return ot(s.dec.decodeFrames(g))}return z}let w=l.feed(f);if(!w.length)return z;if(a.codec==="A_VORBIS"){let b=es(w,s.serial,s.seq);return ot(s.dec.decode(b))}return ot(s.dec.decodeFrames(w))},flush(){if(r)return z;if(r=!0,l=null,s)try{return ot(s.dec.flush?.())}finally{s.dec.free?.(),s=null}return d(),z},free(){r||(r=!0,s?(s.dec.free?.(),s=null):d(),l=null)}}}var zr=class{constructor(e){this.trackNum=e,this.left=null}feed(e){let i=e;this.left&&(i=new Uint8Array(this.left.length+e.length),i.set(this.left),i.set(e,this.left.length),this.left=null);let n=[],r=0;for(;r<i.length;){let s=qr(i,r);if(!s)break;let a=Wr(i,r+s.len);if(!a)break;let o=r+s.len+a.len,h=s.val,l=a.val;if(h===rs||h===Xr||h===is){r=o;continue}if(l<0||o+l>i.length)break;if((h===En||h===Un)&&l>4){let d=o,c=Wr(i,d);c&&c.val===this.trackNum&&(d+=c.len+3,d<o+l&&n.push(i.slice(d,o+l)))}r=o+l}return r<i.length&&(this.left=i.subarray(r).slice()),n}};function Qn(t,e,i){let n=e.channels||t.channels||2,r=e.preSkip||0;!r&&t.codecDelay&&(r=Math.round(t.codecDelay/1e9*48e3));let s={channels:n,sampleRate:48e3,preSkip:r,outputGain:e.outputGain||0};return e.mappingFamily>0?(s.streamCount=e.streamCount,s.coupledStreamCount=e.coupledStreamCount,s.channelMappingTable=e.channelMappingTable):n===1?(s.streamCount=1,s.coupledStreamCount=0,s.channelMappingTable=[0]):n===2&&(s.streamCount=1,s.coupledStreamCount=1,s.channelMappingTable=[0,1]),i.configure(s),{dec:i,channels:n}}function ot(t){if(!t?.channelData?.length)return z;let{channelData:e,samplesDecoded:i,sampleRate:n}=t;return i!=null&&i<e[0].length&&(e=e.map(r=>r.subarray(0,i))),e[0]?.length?{channelData:e,sampleRate:n}:z}function Jr(t,e){let i=new Uint8Array(e),n=0;for(let r of t)i.set(r,n),n+=r.length;return i}function Gn(t,e){return e?.channelData?.length?t?.channelData?.length?{channelData:t.channelData.map((i,n)=>{let r=new Float32Array(i.length+e.channelData[n].length);return r.set(i),r.set(e.channelData[n],i.length),r}),sampleRate:t.sampleRate}:e:t}export{Vn as decoder,Tn as default};

@@ -2962,17 +2962,95 @@ async function decode(src) {
   let buf = src instanceof Uint8Array ? src : new Uint8Array(src);
   let dec = await decoder();
   try {
-    let a = await dec.decode(buf);
-    let b = dec.flush ? await dec.flush() : null;
+    let a = dec.decode(buf);
+    let b = dec.flush();
     return b?.channelData?.length ? merge(a, b) : a;
   } finally {
     dec.free();
   }
 }
 async function decoder() {
-  let d = new FLACDecoder();
-  await d.ready;
-  return d;
+  let upstream = new FLACDecoder();
+  await upstream.ready;
+  let codec2 = upstream._decoder;
+  if (typeof codec2?.decodeFrames !== "function") {
+    upstream.free();
+    throw Error("Unsupported @wasm-audio-decoders/flac internals");
+  }
+  let parser = null, prefix = null, ogg = false, total2 = 0, ended = false, freed = false;
+  let decodeItems = (items) => {
+    if (!items.length) return null;
+    if (!ogg) return codec2.decodeFrames(items.map((f) => f[data2] || f));
+    let frames = items.flatMap((p) => p[codecFrames2].map((f) => f[data2]));
+    let decoded = codec2.decodeFrames(frames);
+    total2 += decoded.samplesDecoded;
+    let page2 = items[items.length - 1];
+    if (page2?.[isLastPage2]) {
+      let trim = total2 - page2[totalSamples2];
+      if (trim > 0) {
+        let keep = Math.max(0, decoded.samplesDecoded - trim);
+        for (let i = 0; i < decoded.channelData.length; i++)
+          decoded.channelData[i] = decoded.channelData[i].subarray(0, keep);
+        total2 -= decoded.samplesDecoded - keep;
+        decoded.samplesDecoded = keep;
+      }
+    }
+    return decoded;
+  };
+  upstream.decode = (chunk) => {
+    if (freed) throw Error("Decoder already freed");
+    if (ended) throw Error("Decoder already flushed");
+    if (!chunk) return EMPTY;
+    let buf = chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk);
+    if (!buf.length) return EMPTY;
+    if (!parser) {
+      if (prefix) buf = concatBytes(prefix, buf);
+      if (buf.length < 4) {
+        prefix = buf.slice();
+        return EMPTY;
+      }
+      prefix = null;
+      ogg = buf[0] === 79 && buf[1] === 103 && buf[2] === 103 && buf[3] === 83;
+      parser = new codec_parser_default(ogg ? "audio/ogg" : "audio/flac", {
+        onCodec: (c) => {
+          if (c !== "flac") throw Error("@audio/decode-flac does not support this codec " + c);
+        },
+        enableFrameCRC32: false
+      });
+    }
+    let r = decodeItems([...parser.parseChunk(buf)]);
+    return r?.channelData?.length ? r : EMPTY;
+  };
+  upstream.flush = () => {
+    if (freed || ended) return EMPTY;
+    ended = true;
+    if (!parser) {
+      prefix = null;
+      return EMPTY;
+    }
+    try {
+      let r = decodeItems([...parser.flush()]);
+      return r?.channelData?.length ? r : EMPTY;
+    } finally {
+      parser = null;
+      prefix = null;
+    }
+  };
+  let free2 = upstream.free.bind(upstream);
+  upstream.free = () => {
+    if (freed) return;
+    freed = true;
+    parser = null;
+    prefix = null;
+    free2();
+  };
+  return upstream;
+}
+function concatBytes(a, b) {
+  let r = new Uint8Array(a.length + b.length);
+  r.set(a);
+  r.set(b, a.length);
+  return r;
 }
 function merge(a, b) {
   if (!b?.channelData?.length) return a;

@@ -2952,17 +2952,85 @@ async function decode(src) {
   let buf = src instanceof Uint8Array ? src : new Uint8Array(src);
   let dec = await decoder();
   try {
-    let a = await dec.decode(buf);
-    let b = dec.flush ? await dec.flush() : null;
+    let a = dec.decode(buf);
+    let b = dec.flush();
     return b?.channelData?.length ? merge(a, b) : a;
   } finally {
     dec.free();
   }
 }
 async function decoder() {
-  let d = new OggVorbisDecoder();
-  await d.ready;
-  return d;
+  let upstream = new OggVorbisDecoder();
+  await upstream.ready;
+  let codec2 = upstream._decoder;
+  if (typeof codec2?.sendSetupHeader !== "function" || typeof codec2.initDsp !== "function" || typeof codec2.decodePackets !== "function") {
+    upstream.free();
+    throw Error("Unsupported @wasm-audio-decoders/ogg-vorbis internals");
+  }
+  let parser = new codec_parser_default("audio/ogg", {
+    onCodec: (c) => {
+      if (c !== "vorbis") throw Error("@audio/decode-vorbis does not support this codec " + c);
+    },
+    enableFrameCRC32: false
+  });
+  let setup = true, total2 = 0, ended = false, freed = false;
+  let decodePages = (pages) => {
+    if (!pages.length) return null;
+    let packets = [];
+    for (let page3 of pages) {
+      if (setup) {
+        if (page3[data2][0] === 1) codec2.sendSetupHeader(page3[data2]);
+        if (page3[codecFrames2].length) {
+          let setupHeader = page3[codecFrames2][0][header2][vorbisSetup2];
+          codec2.sendSetupHeader(setupHeader);
+          codec2.initDsp();
+          setup = false;
+        }
+      }
+      packets.push(...page3[codecFrames2].map((f) => f[data2]));
+    }
+    let decoded = codec2.decodePackets(packets);
+    total2 += decoded.samplesDecoded;
+    let page2 = pages[pages.length - 1];
+    if (page2?.[isLastPage2]) {
+      let trim = total2 - page2[totalSamples2];
+      if (trim > 0) {
+        let keep = Math.max(0, decoded.samplesDecoded - trim);
+        for (let i = 0; i < decoded.channelData.length; i++)
+          decoded.channelData[i] = decoded.channelData[i].subarray(0, keep);
+        total2 -= decoded.samplesDecoded - keep;
+        decoded.samplesDecoded = keep;
+      }
+    }
+    return decoded;
+  };
+  upstream.decode = (chunk) => {
+    if (freed) throw Error("Decoder already freed");
+    if (ended) throw Error("Decoder already flushed");
+    if (!chunk) return EMPTY;
+    let buf = chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk);
+    if (!buf.length) return EMPTY;
+    let r = decodePages([...parser.parseChunk(buf)]);
+    return r?.channelData?.length ? r : EMPTY;
+  };
+  upstream.flush = () => {
+    if (freed || ended) return EMPTY;
+    ended = true;
+    try {
+      let r = decodePages([...parser.flush()]);
+      return r?.channelData?.length ? r : EMPTY;
+    } finally {
+      parser = null;
+    }
+  };
+  let free2 = upstream.free.bind(upstream);
+  upstream.free = () => {
+    if (freed) return;
+    freed = true;
+    parser = null;
+    free2();
+  };
+  return upstream;
 }
 function merge(a, b) {
   if (!b?.channelData?.length) return a;

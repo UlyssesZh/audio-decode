@@ -7,3 +7,6 @@
 [submodule "packages/decode-amr/lib/opencore-amr"]
 	path = packages/decode-amr/lib/opencore-amr
 	url = https://git.code.sf.net/p/opencore-amr/code
+[submodule "packages/decode-opus/lib/opus"]
+	path = packages/decode-opus/lib/opus
+	url = https://github.com/xiph/opus.git

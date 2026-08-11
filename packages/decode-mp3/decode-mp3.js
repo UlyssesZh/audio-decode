@@ -836,31 +836,30 @@ async function decode(src) {
   let buf = src instanceof Uint8Array ? src : new Uint8Array(src);
   let dec = await decoder();
   try {
-    let a = await dec.decode(buf);
-    let b = dec.flush ? await dec.flush() : null;
-    return b?.channelData?.length ? merge(a, b) : a;
+    return dec.decode(buf);
   } finally {
     dec.free();
   }
 }
 async function decoder() {
-  let d = new MPEGDecoder();
-  await d.ready;
-  return d;
-}
-function merge(a, b) {
-  if (!b?.channelData?.length) return a;
-  if (!a?.channelData?.length) return b;
-  return {
-    channelData: a.channelData.map((ch, i) => {
-      let bc = b.channelData[i] || b.channelData[0];
-      let m = new Float32Array(ch.length + bc.length);
-      m.set(ch);
-      m.set(bc, ch.length);
-      return m;
-    }),
-    sampleRate: a.sampleRate
+  let upstream = new MPEGDecoder();
+  await upstream.ready;
+  let decode2 = upstream.decode.bind(upstream);
+  let free = upstream.free.bind(upstream);
+  let freed = false;
+  upstream.decode = (chunk) => {
+    if (freed) throw Error("Decoder already freed");
+    if (!chunk) return EMPTY;
+    let buf = chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk);
+    if (!buf.length) return EMPTY;
+    return decode2(buf);
   };
+  upstream.free = () => {
+    if (freed) return;
+    freed = true;
+    free();
+  };
+  return upstream;
 }
 export {
   decoder,

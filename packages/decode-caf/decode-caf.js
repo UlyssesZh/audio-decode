@@ -2,7 +2,7 @@
  * CAF (Core Audio Format) decoder
  * Decodes CAF containers with lpcm, alaw, ulaw audio to Float32 PCM
  *
- * let { channelData, sampleRate } = await decode(cafbuf)
+ * let { channelData, sampleRate } = decode(cafbuf)
  */
 
 const EMPTY = Object.freeze({ channelData: [], sampleRate: 0 })
@@ -11,22 +11,15 @@ const EMPTY = Object.freeze({ channelData: [], sampleRate: 0 })
 const IMA_STEP = new Int16Array([7,8,9,10,11,12,13,14,16,17,19,21,23,25,28,31,34,37,41,45,50,55,60,66,73,80,88,97,107,118,130,143,157,173,190,209,230,253,279,307,337,371,408,449,494,544,598,658,724,796,876,963,1060,1166,1282,1411,1552,1707,1878,2066,2272,2499,2749,3024,3327,3660,4026,4428,4871,5358,5894,6484,7132,7845,8630,9493,10442,11487,12635,13899,15289,16818,18500,20350,22385,24623,27086,29794,32767])
 const IMA_IDX = new Int8Array([-1,-1,-1,-1,2,4,6,8,-1,-1,-1,-1,2,4,6,8])
 
-/**
- * Whole-file decode
- * @param {Uint8Array|ArrayBuffer} src
- * @returns {Promise<{channelData: Float32Array[], sampleRate: number}>}
- */
-export default async function decode(src) {
-	let dec = await decoder()
+/** Decode a complete CAF file synchronously. */
+export default function decode(src) {
+	let dec = decoder()
 	try { return dec.decode(src) }
 	finally { dec.free() }
 }
 
-/**
- * Create decoder instance (streaming-aware)
- * @returns {Promise<{decode(chunk: Uint8Array): {channelData, sampleRate}, flush(), free()}>}
- */
-export async function decoder() {
+/** Create a synchronous streaming decoder. */
+export function decoder() {
 	let hdr = null, left = null, freed = false, dataLeft = Infinity
 	return {
 		decode(data) {
@@ -40,9 +33,9 @@ export async function decoder() {
 				dataLeft = hdr.dataSize
 				chunk = chunk.subarray(hdr.dataStart)
 			}
-			if (dataLeft <= 0) return EMPTY // past the data chunk — ignore trailing chunks
+			if (dataLeft <= 0) return EMPTY // Ignore chunks after the declared audio data.
 			let fb = hdr.frameBytes
-			let avail = Math.min(chunk.length, dataLeft) // don't read past the declared data size
+			let avail = Math.min(chunk.length, dataLeft) // Do not read past the declared data size.
 			let complete = Math.floor(avail / fb) * fb
 			if (!complete) { if (chunk.length && dataLeft > chunk.length) left = chunk.slice(); return EMPTY }
 			dataLeft -= complete

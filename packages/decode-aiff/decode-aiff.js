@@ -456,14 +456,10 @@ function gsmRpeDecode(xmaxc, Mc, xMc, erp) {
 	for (let i = 0; i < 13; i++) erp[Mc + 3 * i] = xMp[i]
 }
 
-/**
- * Whole-file decode
- * @param {Uint8Array|ArrayBuffer} src
- * @returns {Promise<{channelData: Float32Array[], sampleRate: number}>}
- */
-export default async function decode(src) {
+/** Decode a complete AIFF file synchronously. */
+export default function decode(src) {
 	let buf = src instanceof Uint8Array ? src : src instanceof ArrayBuffer ? new Uint8Array(src) : src
-	let dec = await decoder()
+	let dec = decoder()
 	try {
 		let result = dec.decode(buf)
 		if (!result.channelData.length) result = dec.flush()
@@ -473,27 +469,26 @@ export default async function decode(src) {
 	}
 }
 
-/**
- * Create decoder instance
- * @returns {Promise<{decode(chunk: Uint8Array): {channelData, sampleRate}, flush(), free()}>}
- */
-export async function decoder() {
-	let hdr = null, left = null, freed = false
+/** Create a synchronous decoder. */
+export function decoder() {
+	let hdr = null, left = null, deferredChunks = null, deferredLength = 0, freed = false
 	return {
 		decode(data) {
 			if (freed) throw Error('Decoder already freed')
-			if (!data?.length) return EMPTY
+			if (!data || !data.byteLength) return EMPTY
 			let chunk = data instanceof Uint8Array ? data : new Uint8Array(data)
 			if (left) { chunk = cat(left, chunk); left = null }
 			if (!hdr) {
 				hdr = scanAiffHdr(chunk)
 				if (!hdr) { left = chunk.slice(); return EMPTY }
-				// IMA4/GSM: buffer all SSND data, decode on flush
-				if (hdr.comp === 'ima4' || hdr.comp === 'GSM ' || hdr.comp === 'gsm ') {
-					left = chunk.slice()
-					return EMPTY
-				}
-				chunk = chunk.subarray(hdr.dataStart)
+				deferredChunks = hdr.comp === 'ima4' || hdr.comp === 'GSM ' || hdr.comp === 'gsm ' ? [] : null
+				if (!deferredChunks) chunk = chunk.subarray(hdr.dataStart)
+			}
+			// IMA4 and GSM need the complete container.
+			if (deferredChunks) {
+				deferredChunks.push(new Uint8Array(chunk))
+				deferredLength += chunk.length
+				return EMPTY
 			}
 			let fb = hdr.frameBytes
 			let complete = Math.floor(chunk.length / fb) * fb
@@ -502,15 +497,16 @@ export async function decoder() {
 			return decodeAiffRaw(chunk.subarray(0, complete), hdr)
 		},
 		flush() {
-			if (hdr && left && (hdr.comp === 'ima4' || hdr.comp === 'GSM ' || hdr.comp === 'gsm ')) {
-				let result = parseAiff(left)
-				left = null
-				return result
+			if (deferredChunks && deferredLength) {
+				let input = new Uint8Array(deferredLength), offset = 0
+				for (let chunk of deferredChunks) { input.set(chunk, offset); offset += chunk.length }
+				deferredChunks = []; deferredLength = 0
+				return parseAiff(input)
 			}
 			left = null
 			return EMPTY
 		},
-		free() { freed = true; left = null; hdr = null },
+		free() { freed = true; left = null; hdr = null; deferredChunks = null; deferredLength = 0 },
 	}
 }
 

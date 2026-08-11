@@ -1,21 +1,19 @@
 # @audio/decode-qoa
 
-Decode QOA (Quite OK Audio) to PCM samples. Self-contained bundle — no import map entries needed.
-
-Wraps [qoa-format](https://github.com/nicokoenig/qoa-format).
+Decode QOA (Quite OK Audio) to PCM samples with [qoa-format](https://github.com/nicokoenig/qoa-format).
 
 ```js
 import decode, { decoder } from '@audio/decode-qoa'
 
-// whole-file
-let { channelData, sampleRate } = await decode(qoabuf)
+let { channelData, sampleRate } = decode(qoaBytes)
 
-// streaming (stateless — each chunk must be a complete QOA file)
-let dec = await decoder()
-let a = dec.decode(chunk)
+let dec = decoder()
+let result = dec.decode(completeQoaFile)
 dec.free()
 ```
 
+`decode()` and `decoder()` are synchronous. The decoder is stateless, so every chunk must contain a complete QOA file.
+
 ## License
 
-[MIT](./LICENSE) · [ॐ](https://github.com/krishnized/license/)
+[ॐ](https://github.com/krishnized/license/) · [MIT](./LICENSE)

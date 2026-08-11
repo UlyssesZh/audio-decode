@@ -70,7 +70,7 @@ class AMRDecoder {
 
 	decode(data) {
 		if (this.done) throw Error('Decoder already freed')
-		if (!data?.length) return EMPTY
+		if (!data || !data.byteLength) return EMPTY
 
 		let buf = data instanceof Uint8Array ? data : new Uint8Array(data)
 		if (this._left) {

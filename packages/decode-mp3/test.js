@@ -25,11 +25,15 @@ console.log('MP3 streaming')
 	let dec = await decoder()
 	let buf = new Uint8Array(mp3)
 	let mid = Math.floor(buf.length / 2)
-	let a = await dec.decode(buf.subarray(0, mid))
-	let b = await dec.decode(buf.subarray(mid))
-	dec.free()
+	let a = dec.decode(buf.slice(0, mid).buffer) // ArrayBuffer chunk
+	let b = dec.decode(buf.subarray(mid))
+	ok(!(a instanceof Promise) && !(b instanceof Promise), 'decode returns values')
 	let total = (a.channelData[0]?.length || 0) + (b.channelData[0]?.length || 0)
 	ok(total > 0, 'decoded samples: ' + total)
+	dec.free()
+	let threw = false
+	try { dec.decode(buf) } catch { threw = true }
+	ok(threw, 'decode after free throws')
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

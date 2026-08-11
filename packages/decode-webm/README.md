@@ -1,8 +1,6 @@
 # @audio/decode-webm
 
-Decode WebM audio (Opus and Vorbis) to PCM float samples. EBML demuxer in pure JS, codec decoding via WASM.
-
-Part of [decode](https://github.com/audiojs/decode).
+Decode WebM Opus and Vorbis audio to PCM float samples.
 
 ## Install
 
@@ -13,19 +11,13 @@ npm i @audio/decode-webm
 ## Usage
 
 ```js
-import decode from '@audio/decode-webm'
+import decode, { decoder } from '@audio/decode-webm'
 
-let { channelData, sampleRate } = await decode(webmBuffer)
-```
+let { channelData, sampleRate } = await decode(webmBytes)
 
-### Streaming
-
-```js
-import { decoder } from '@audio/decode-webm'
-
-let dec = await decoder()
-let result = await dec.decode(chunk)
-let flushed = await dec.flush()
+let dec = await decoder() // initialize Opus and Vorbis WASM
+let result = dec.decode(chunk)
+let tail = dec.flush()
 dec.free()
 ```
 
@@ -33,25 +25,19 @@ dec.free()
 
 ### `decode(src): Promise<AudioData>`
 
-Whole-file decode. Accepts `Uint8Array` or `ArrayBuffer`.
+Decode a complete `Uint8Array` or `ArrayBuffer`.
 
 ### `decoder(): Promise<WebmDecoder>`
 
-Creates a decoder instance.
+Initialize the codec runtimes and return a streaming decoder. Its `decode()` and `flush()` methods are synchronous. `flush()` ends the stream.
 
-- **`dec.decode(data)`** — decode chunk, returns `Promise<AudioData>`
-- **`dec.flush()`** — flush remaining data
-- **`dec.free()`** — release resources
-
-Note: `decode()` and `flush()` are async (unlike the sync PCM decoders) because Opus decoding happens in WASM.
+WebM identifies its audio codec in the EBML header. The factory prepares both runtimes, then releases the unused one after reading that header.
 
 ## Codecs
 
-- **Opus** — via [opus-decoder](https://github.com/eshaz/wasm-audio-decoders)
-- **Vorbis** — via [@wasm-audio-decoders/ogg-vorbis](https://github.com/eshaz/wasm-audio-decoders) (raw frames wrapped in OGG pages)
+- Opus uses the local libopus WASM core from `@audio/decode-opus`.
+- Vorbis uses `@audio/decode-vorbis`.
 
 ## License
 
-MIT
-
-<a href="https://github.com/krishnized/license/">ॐ</a>
+[ॐ](https://github.com/krishnized/license/) · [MIT](./LICENSE). Bundled [libopus](https://opus-codec.org/) is [BSD 3-Clause](./LICENSE.libopus).

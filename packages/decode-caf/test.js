@@ -184,6 +184,26 @@ console.log('16-bit LE stereo')
 	ok(diff > 0.1, 'L/R channels differ')
 }
 
+// ---- sync API ----
+console.log('sync CAF')
+{
+	let caf = buildCAF({ sampleRate: 44100, formatID: 'lpcm', formatFlags: 2, bitsPerChannel: 16, channelsPerFrame: 2, samples: [tone440, tone880] })
+	let r = decode(caf)
+	ok(!(r instanceof Promise), 'decode returns value, not promise')
+	ok(r.channelData.length === 2, 'decode: 2 channels')
+	ok(r.channelData[0].length === tone440.length, 'decode: correct frame count')
+
+	let dec = decoder()
+	ok(!(dec instanceof Promise), 'decoder returns instance, not promise')
+	let bytes = new Uint8Array(caf)
+	let half = bytes.length >> 1
+	let a = dec.decode(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + half))
+	let b = dec.decode(bytes.subarray(half))
+	dec.free()
+	let total = (a.channelData[0]?.length || 0) + (b.channelData[0]?.length || 0)
+	ok(total === tone440.length, 'decoder: chunked ArrayBuffer decode complete')
+}
+
 // ---- 16-bit BE stereo ----
 console.log('16-bit BE stereo')
 {

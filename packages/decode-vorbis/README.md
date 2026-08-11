@@ -1,34 +1,31 @@
 # @audio/decode-vorbis
 
-Decode Ogg Vorbis audio to PCM samples. Self-contained WASM bundle — no import map entries needed.
-
-Wraps [@wasm-audio-decoders/ogg-vorbis](https://github.com/eshaz/wasm-audio-decoders).
+Decode Ogg Vorbis audio with [@wasm-audio-decoders/ogg-vorbis](https://github.com/eshaz/wasm-audio-decoders).
 
 ```js
 import decode, { decoder } from '@audio/decode-vorbis'
 
-// whole-file
-let { channelData, sampleRate } = await decode(oggbuf)
+let { channelData, sampleRate } = await decode(oggBytes)
 
-// streaming
-let dec = await decoder()
+let dec = await decoder() // initialize WASM
 let a = dec.decode(chunk1)
 let b = dec.decode(chunk2)
-let c = dec.flush()
+let tail = dec.flush()
 dec.free()
 ```
 
+`decoder()` is asynchronous. Its `decode()` and `flush()` methods are synchronous. `flush()` ends the stream.
+
 ## Metadata
 
-Read Vorbis comment tags (and cover art) without decoding audio:
+Read Vorbis comments and cover art without decoding audio:
 
 ```js
 import { parseMeta } from '@audio/decode-vorbis/meta'
 
 let { meta, sampleRate } = parseMeta(oggBytes)
-// meta: { title, artist, album, year, genre, ..., pictures }
 ```
 
 ## License
 
-[MIT](./LICENSE) · [ॐ](https://github.com/krishnized/license/)
+[ॐ](https://github.com/krishnized/license/) · [MIT](./LICENSE)

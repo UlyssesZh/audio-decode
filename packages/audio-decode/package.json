@@ -1,7 +1,7 @@
 {
   "name": "audio-decode",
-  "version": "3.11.5",
-  "description": "Decode audio (wav, mp3, flac, ogg, opus, aac, …) to AudioBuffer — unscoped alias of @audio/decode",
+  "version": "3.12.0",
+  "description": "Decode audio to AudioBuffer; unscoped alias of @audio/decode",
   "type": "module",
   "sideEffects": false,
   "main": "audio-decode.js",

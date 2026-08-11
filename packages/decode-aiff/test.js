@@ -8,6 +8,14 @@ function ok(cond, msg) {
 }
 function near(a, b, tol = 0.01) { return Math.abs(a - b) < tol }
 function rms(ch) { let s = 0; for (let v of ch) s += v * v; return Math.sqrt(s / ch.length) }
+function decodeChunked(source, size = 97) {
+	let dec = decoder(), emitted = 0
+	for (let offset = 0; offset < source.length; offset += size)
+		emitted += dec.decode(source.subarray(offset, offset + size)).channelData[0]?.length || 0
+	let tail = dec.flush()
+	dec.free()
+	return { emitted, tail }
+}
 
 // ===== AIFF fixture builders =====
 
@@ -193,6 +201,27 @@ console.log('mono 16-bit AIFF')
 	let maxAbs = 0
 	for (let v of r.channelData[0]) maxAbs = Math.max(maxAbs, Math.abs(v))
 	ok(near(maxAbs, 0.5, 0.01), 'peak ~0.5')
+}
+
+// ---- sync API ----
+console.log('sync AIFF')
+{
+	let samples = stereoSine(440, 880, 44100, 1000)
+	let aiff = buildAIFF({ sr: 44100, nCh: 2, bps: 16, samples })
+	let r = decode(aiff)
+	ok(!(r instanceof Promise), 'decode returns value, not promise')
+	ok(r.channelData.length === 2, 'decode: stereo')
+	ok(r.channelData[0].length === 1000, 'decode: frames')
+
+	let dec = decoder()
+	ok(!(dec instanceof Promise), 'decoder returns instance, not promise')
+	let half = aiff.length >> 1
+	let a = dec.decode(aiff.buffer.slice(aiff.byteOffset, aiff.byteOffset + half))
+	let b = dec.decode(aiff.subarray(half))
+	let f = dec.flush()
+	dec.free()
+	let total = (a.channelData[0]?.length || 0) + (b.channelData[0]?.length || 0) + (f.channelData[0]?.length || 0)
+	ok(total === 1000, 'decoder: chunked ArrayBuffer decode complete')
 }
 
 // ---- Stereo 16-bit decode ----
@@ -664,18 +693,30 @@ console.log('audacity: 64-bit float')
 
 console.log('audacity: IMA ADPCM (ima4)')
 {
-	let r = await decode(readFileSync(new URL('audacity/lena-ima-adpcm.aiff', import.meta.resolve('audio-lena'))))
+	let source = readFileSync(new URL('audacity/lena-ima-adpcm.aiff', import.meta.resolve('audio-lena')))
+	let r = await decode(source)
 	ok(r.sampleRate === 44100, 'sampleRate 44100')
 	ok(near(r.channelData[0].length / r.sampleRate, 12.27, 0.1), 'duration ~12.27s')
 	ok(rms(r.channelData[0]) > 0.05, 'has audio')
+
+	let { emitted, tail } = decodeChunked(source)
+	ok(emitted === 0, 'chunked ima4 waits for flush')
+	ok(!(tail instanceof Promise), 'ima4 flush returns value')
+	let matches = tail.channelData[0].length === r.channelData[0].length && tail.channelData[0].every((sample, i) => sample === r.channelData[0][i])
+	ok(matches, 'chunked ima4 matches whole-file output')
 }
 
 console.log('audacity: GSM 6.10')
 {
-	let r = await decode(readFileSync(new URL('audacity/lena-gsm.aiff', import.meta.resolve('audio-lena'))))
+	let source = readFileSync(new URL('audacity/lena-gsm.aiff', import.meta.resolve('audio-lena')))
+	let r = decode(source)
 	ok(r.sampleRate === 44100, 'sampleRate 44100')
 	ok(near(r.channelData[0].length / r.sampleRate, 12.27, 0.1), 'duration ~12.27s')
 	ok(rms(r.channelData[0]) > 0.05, 'has audio (GSM)')
+	let { emitted, tail } = decodeChunked(source)
+	ok(emitted === 0, 'chunked GSM waits for flush')
+	let matches = tail.channelData[0].length === r.channelData[0].length && tail.channelData[0].every((sample, i) => sample === r.channelData[0][i])
+	ok(matches, 'chunked GSM matches whole-file output')
 }
 
 console.log('audacity: mu-law 44.1kHz')

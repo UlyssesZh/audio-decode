@@ -1,7 +1,7 @@
 # @audio/decode [![test](https://github.com/audiojs/decode/actions/workflows/test.js.yml/badge.svg)](https://github.com/audiojs/decode/actions/workflows/test.js.yml)
 
 Decode any audio format to raw samples.<br>
-JS / WASM – no ffmpeg, no native bindings, works in both node and browser.<br>
+JS / WASM with no ffmpeg or native bindings; works in Node.js and browsers.<br>
 Small API, minimal size, near-native performance, lazy-loading, chunked decoding.
 
 [![npm install @audio/decode](https://nodei.co/npm/@audio/decode.png?mini=true)](https://npmjs.org/package/@audio/decode/)
@@ -17,22 +17,22 @@ const { channelData, sampleRate } = await decode(anyAudioBuffer);
 | Format | Package | Size | Engine |
 |--------|---------|------|--------|
 | MP3 | [@audio/decode-mp3](./packages/decode-mp3) | 92 KB | WASM |
-| WAV | [@audio/decode-wav](./packages/decode-wav) | 4 KB | JS |
-| OGG Vorbis | [@audio/decode-vorbis](./packages/decode-vorbis) | 164 KB | WASM |
-| FLAC | [@audio/decode-flac](./packages/decode-flac) | 133 KB | WASM |
-| Opus | [@audio/decode-opus](./packages/decode-opus) | 178 KB | WASM |
+| WAV | [@audio/decode-wav](./packages/decode-wav) | 11 KB | JS |
+| OGG Vorbis | [@audio/decode-vorbis](./packages/decode-vorbis) | 166 KB | WASM |
+| FLAC | [@audio/decode-flac](./packages/decode-flac) | 135 KB | WASM |
+| Opus | [@audio/decode-opus](./packages/decode-opus) | 166 KB | WASM |
 | M4A / AAC / ALAC | [@audio/decode-aac](./packages/decode-aac) | 368 KB | WASM + JS |
 | QOA | [@audio/decode-qoa](./packages/decode-qoa) | 8 KB | JS |
 | AIFF | [@audio/decode-aiff](./packages/decode-aiff) | 20 KB | JS |
-| CAF | [@audio/decode-caf](./packages/decode-caf) | 7 KB | JS |
-| WebM | [@audio/decode-webm](./packages/decode-webm) | 263 KB | WASM |
+| CAF | [@audio/decode-caf](./packages/decode-caf) | 9 KB | JS |
+| WebM | [@audio/decode-webm](./packages/decode-webm) | 250 KB | WASM |
 | AMR | [@audio/decode-amr](./packages/decode-amr) | 241 KB | WASM |
 | WMA | [@audio/decode-wma](./packages/decode-wma) | 91 KB | WASM |
 
 ### Whole-file
 
 Auto-detects format. Input can be _ArrayBuffer_, _Uint8Array_, _Buffer_, or anything
-that materializes to bytes — a _Blob_/_File_ (browser file input, drag-drop) or a fetch _Response_.
+that materializes to bytes, including a _Blob_/_File_ or fetch _Response_.
 
 ```js
 import decode from '@audio/decode'
@@ -42,6 +42,27 @@ let fromFile = await decode(fileInput.files[0])   // File
 let fromUrl  = await decode(await fetch(url))      // Response
 ```
 
+### Synchronous codecs
+
+The umbrella remains async for detection, lazy imports, and `Blob`/`Response` inputs.
+Import a codec package directly for synchronous calls.
+
+`wav`, `qoa`, `aiff`, and `caf` are synchronous:
+
+```js
+import decode from '@audio/decode-wav'
+let pcm = decode(wavBytes)
+```
+
+WASM codecs initialize asynchronously, then decode synchronously:
+
+```js
+import { decoder } from '@audio/decode-flac'
+let dec = await decoder()
+let pcm = dec.decode(bytes)
+let tail = dec.flush()
+dec.free()
+```
 
 ### Chunked
 
@@ -68,7 +89,7 @@ Formats: `mp3`, `flac`, `opus`, `oga`, `m4a`, `wav`, `qoa`, `aac`, `aiff`, `caf`
 
 ### Browser
 
-Works from CDN without a bundler – codecs load on demand via dynamic import, only for formats you actually decode:
+Works from a CDN without a bundler. Codecs load on demand via dynamic import, only for formats you decode:
 
 ```html
 <script type="module">
@@ -77,7 +98,7 @@ Works from CDN without a bundler – codecs load on demand via dynamic import, o
 </script>
 ```
 
-Self-hosting instead of a CDN? Use an import map to point `@audio/decode` and each `@audio/decode-*` package you need to its local path – every codec is a self-contained bundle (WASM inlined, no transitive deps).
+For self-hosting, use an import map to point `@audio/decode` and each needed `@audio/decode-*` package to local files. Codec-internal files load by relative path.
 
 ### Metadata
 
@@ -102,7 +123,7 @@ let info = parseMeta(wavBytes)
 
 ### WebWorker
 
-Each `@audio/decode-*` package is a self-contained ESM module — import directly in a worker:
+Each `@audio/decode-*` package is a self-contained ESM module that can run in a worker:
 
 ```js
 // decode-worker.js
@@ -130,6 +151,6 @@ worker.onmessage = ({ data }) => { /* { channelData, sampleRate } */ }
 * [ffmpeg.wasm](https://github.com/ffmpegwasm/ffmpeg.wasm) – full encoding/decoding library.
 -->
 
-<p align="center">Licensing: the umbrella and most codec atoms are MIT; three atoms inherit their upstream codec implementation's license — <a href="./packages/decode-aac">@audio/decode-aac</a> GPL-2.0, <a href="./packages/decode-wma">@audio/decode-wma</a> GPL-2.0-or-later, <a href="./packages/decode-amr">@audio/decode-amr</a> Apache-2.0. Install only the codecs whose licenses fit your project — the umbrella loads them on demand.</p>
+<p align="center">Licensing: the umbrella and most codec packages are MIT. Three codecs use another license: <a href="./packages/decode-aac">@audio/decode-aac</a> GPL-2.0, <a href="./packages/decode-wma">@audio/decode-wma</a> GPL-2.0-or-later, and <a href="./packages/decode-amr">@audio/decode-amr</a> Apache-2.0. Install only the codecs whose licenses fit your project. The umbrella loads them on demand.</p>
 
-<p align="center"><a href="./LICENSE">MIT</a> • <a href="https://github.com/krishnized/license/">ॐ</a>
+<p align="center"><a href="https://github.com/krishnized/license/">ॐ</a> · <a href="./LICENSE">MIT</a>

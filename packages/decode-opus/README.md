@@ -1,26 +1,24 @@
 # @audio/decode-opus
 
-Decode Ogg Opus audio to PCM samples. Self-contained WASM bundle — no import map entries needed.
-
-Wraps [ogg-opus-decoder](https://github.com/eshaz/wasm-audio-decoders/tree/main/src/ogg-opus-decoder).
+Decode Ogg Opus audio to PCM samples with libopus WASM.
 
 ```js
 import decode, { decoder } from '@audio/decode-opus'
 
-// whole-file
-let { channelData, sampleRate } = await decode(opusbuf)
+let { channelData, sampleRate } = await decode(opusBytes)
 
-// streaming
-let dec = await decoder()
+let dec = await decoder() // initialize WASM
 let a = dec.decode(chunk1)
 let b = dec.decode(chunk2)
-let c = dec.flush()
+let tail = dec.flush()
 dec.free()
 ```
 
+`decoder()` is asynchronous. Its `decode()` and `flush()` methods are synchronous. `flush()` ends the stream.
+
 ## Metadata
 
-Read OpusTags (Vorbis comment) metadata and cover art without decoding audio:
+Read OpusTags metadata and cover art without decoding audio:
 
 ```js
 import { parseMeta } from '@audio/decode-opus/meta'
@@ -31,4 +29,4 @@ let { meta, sampleRate } = parseMeta(opusBytes)
 
 ## License
 
-[MIT](./LICENSE) · [ॐ](https://github.com/krishnized/license/)
+[ॐ](https://github.com/krishnized/license/) · [MIT](./LICENSE). Bundled [libopus](https://opus-codec.org/) is [BSD 3-Clause](./LICENSE.libopus).

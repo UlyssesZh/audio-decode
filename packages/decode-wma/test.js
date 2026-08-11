@@ -1,4 +1,4 @@
-import decode, { demuxASF, parsePacket } from './decode-wma.js'
+import decode, { decoder, demuxASF, parsePacket } from './decode-wma.js'
 import { execSync } from 'child_process'
 import { existsSync, readFileSync, mkdirSync } from 'fs'
 
@@ -206,6 +206,24 @@ if (hasMono) {
 	ok(!Number.isNaN(asf.packetSize) && asf.packetSize !== undefined, 'packetSize is not NaN/undefined')
 } else {
 	console.log('SKIP: NaN check (no ffmpeg / fixture)')
+}
+
+// --- Synchronous decoder methods ---
+
+{
+	let dec = await decoder()
+	let result = dec.decode(new Uint8Array())
+	let tail = dec.flush()
+	ok(!(result instanceof Promise) && !(tail instanceof Promise), 'decode and flush return values')
+	dec.free()
+	if (hasMono) {
+		let source = readFileSync(monoPath)
+		let input = source.buffer.slice(source.byteOffset, source.byteOffset + source.byteLength)
+		dec = await decoder()
+		result = dec.decode(input)
+		dec.free()
+		ok(result.channelData[0]?.length > 0, 'decoder accepts ArrayBuffer')
+	}
 }
 
 // --- WASM decode: real file ---

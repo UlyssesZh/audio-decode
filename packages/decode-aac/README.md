@@ -1,6 +1,6 @@
 # @audio/decode-aac
 
-Decode AAC/M4A and ALAC (Apple Lossless) audio to PCM float samples. AAC via FAAD2 (WASM); ALAC via a pure-JS port of Apple's reference decoder — auto-detected from the M4A sample entry. Works in Node.js and browsers, no native dependencies.
+Decode AAC/M4A and ALAC audio to PCM float samples. FAAD2 WASM handles AAC; a pure-JS port of Apple's reference decoder handles ALAC. The M4A sample entry selects the codec.
 
 ## Install
 
@@ -13,7 +13,7 @@ npm i @audio/decode-aac
 ```js
 import decode from '@audio/decode-aac'
 
-// M4A or raw ADTS — auto-detected
+// M4A or raw ADTS; auto-detected
 let { channelData, sampleRate } = await decode(uint8array)
 // channelData: Float32Array[] (one per channel)
 // sampleRate: number
@@ -29,6 +29,8 @@ let { channelData, sampleRate } = dec.decode(chunk)
 dec.free()
 ```
 
+`decoder()` is asynchronous. Its `decode()` and `flush()` methods are synchronous.
+
 ## API
 
 ### `decode(src: Uint8Array | ArrayBuffer): Promise<AudioData>`
@@ -39,9 +41,9 @@ Whole-file decode. Auto-detects M4A (MP4 container) vs raw ADTS.
 
 Creates a decoder instance for manual control.
 
-- **`dec.decode(data)`** — decode chunk, returns `{ channelData, sampleRate }`
-- **`dec.flush()`** — flush remaining (returns empty for AAC)
-- **`dec.free()`** — release WASM memory
+- `dec.decode(data)`: decode a `Uint8Array` or `ArrayBuffer` chunk.
+- `dec.flush()`: discard buffered partial data and return an empty result.
+- `dec.free()`: release WASM memory.
 
 ### `AudioData`
 
@@ -51,8 +53,8 @@ Creates a decoder instance for manual control.
 
 ## Formats
 
-- M4A / MP4 with AAC audio (LC, HE-AAC v1/v2 — SBR, PS)
-- M4A / MP4 with ALAC (Apple Lossless), 16/20/24/32-bit — pure JS, bit-exact
+- M4A / MP4 with AAC audio (LC and HE-AAC v1/v2 with SBR or PS)
+- M4A / MP4 with bit-exact pure-JS ALAC decoding at 16, 20, 24, or 32 bits
 - Raw ADTS streams (.aac)
 
 ## Metadata
@@ -66,4 +68,4 @@ let { meta, sampleRate } = parseMeta(m4aBytes)
 
 ## License
 
-AAC decoding: GPL-2.0 (FAAD2). ALAC decoding: Apache-2.0 (port of Apple's ALAC reference). — [krishnized](https://github.com/krishnized/license)
+[ॐ](https://github.com/krishnized/license/) · AAC decoding [GPL-2.0](./LICENSE) (FAAD2), ALAC decoding Apache-2.0 (port of Apple's ALAC reference)

@@ -1,10 +1,10 @@
-interface AudioData {
+export interface AudioData {
   channelData: Float32Array[];
   sampleRate: number;
 }
 
 interface AMRDecoder {
-  decode(data: Uint8Array): AudioData;
+  decode(data: Uint8Array | ArrayBuffer): AudioData;
   flush(): AudioData;
   free(): void;
 }

@@ -1,6 +1,6 @@
 {
   "name": "@audio/decode-webm",
-  "version": "1.3.3",
+  "version": "1.4.0",
   "description": "Decode WebM audio (Opus, Vorbis) to PCM samples",
   "type": "module",
   "main": "decode-webm.js",
@@ -16,13 +16,15 @@
   "files": [
     "decode-webm.js",
     "decode-webm.d.ts",
+    "src/opus.wasm.js",
     "LICENSE",
+    "LICENSE.libopus",
     "audio.js",
     "audio.d.ts"
   ],
   "dependencies": {
-    "@wasm-audio-decoders/ogg-vorbis": "^0.1.20",
-    "opus-decoder": "^0.7.6"
+    "@audio/decode-opus": "^1.3.0",
+    "@audio/decode-vorbis": "^1.3.0"
   },
   "keywords": [
     "webm",

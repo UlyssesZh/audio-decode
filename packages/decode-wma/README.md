@@ -1,8 +1,6 @@
 # @audio/decode-wma
 
-Decode WMA audio to PCM float samples. ASF demuxer in pure JS, WMA decoding via [RockBox](https://www.rockbox.org/) fixed-point decoder compiled to WASM (70 KB).
-
-Part of [decode](https://github.com/audiojs/decode).
+Decode WMA audio to PCM float samples. The package combines a pure-JS ASF demuxer with the [RockBox](https://www.rockbox.org/) fixed-point decoder compiled to WASM.
 
 ## Install
 
@@ -28,6 +26,8 @@ let result = dec.decode(chunk)
 dec.free()
 ```
 
+`decoder()` is asynchronous. Its `decode()` and `flush()` methods are synchronous.
+
 ### ASF demuxer only
 
 ```js
@@ -46,9 +46,9 @@ Whole-file decode. Accepts `Uint8Array` or `ArrayBuffer`.
 
 Creates a decoder instance.
 
-- **`dec.decode(data)`** — decode chunk, returns `{ channelData, sampleRate }`
-- **`dec.flush()`** — flush (returns empty)
-- **`dec.free()`** — release WASM memory
+- `dec.decode(data)`: decode a `Uint8Array` or `ArrayBuffer` chunk.
+- `dec.flush()`: decode a buffered variable-size packet or return an empty result.
+- `dec.free()`: release WASM memory.
 
 ### `demuxASF(buf): ASFInfo`
 
@@ -71,6 +71,4 @@ RockBox source is included in `lib/rockbox-wma/` (3 files, 152 KB).
 
 ## License
 
-GPL-2.0+ (RockBox)
-
-<a href="https://github.com/krishnized/license/">ॐ</a>
+[ॐ](https://github.com/krishnized/license/) · [GPL-2.0+](./LICENSE) (RockBox)

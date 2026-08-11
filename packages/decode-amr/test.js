@@ -134,7 +134,10 @@ console.log('cross-validation')
 	// decode() vs decoder() produce identical output
 	let via_decode = await decode(nb)
 	let d = await decoder()
-	let via_decoder = d.decode(new Uint8Array(nb))
+	let input = nb.buffer.slice(nb.byteOffset, nb.byteOffset + nb.byteLength)
+	let via_decoder = d.decode(input)
+	let tail = d.flush()
+	ok(!(via_decoder instanceof Promise) && !(tail instanceof Promise), 'decode and flush return values')
 	d.free()
 	ok(via_decode.channelData[0].length === via_decoder.channelData[0].length, 'decode() vs decoder() same length')
 	let match = true

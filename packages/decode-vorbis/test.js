@@ -13,22 +13,59 @@ function rms(f32) { let s = 0; for (let i = 0; i < f32.length; i++) s += f32[i] 
 
 // whole-file decode
 console.log('Vorbis whole-file')
-{
-	let r = await decode(ogg)
-	ok(r.channelData.length >= 1, 'has channels')
-	ok(r.sampleRate === 44100, 'sampleRate 44100')
-	ok(near(r.channelData[0].length / r.sampleRate, 12.27), 'duration ~12.27s')
-	ok(rms(r.channelData[0]) > 0.05, 'has audio content')
-}
+let whole = await decode(ogg)
+ok(whole.channelData.length >= 1, 'has channels')
+ok(whole.sampleRate === 44100, 'sampleRate 44100')
+ok(near(whole.channelData[0].length / whole.sampleRate, 12.27), 'duration ~12.27s')
+ok(rms(whole.channelData[0]) > 0.05, 'has audio content')
 
-// streaming decoder
+// one async init, synchronous decode calls
 console.log('Vorbis streaming')
 {
 	let dec = await decoder()
-	let buf = new Uint8Array(ogg)
-	let a = await dec.decode(buf)
+	let empty = dec.decode(null), zero = dec.decode(new Uint8Array())
+	ok(!(empty instanceof Promise) && !(zero instanceof Promise) && !empty.channelData.length && !zero.channelData.length, 'null and empty chunks return empty values')
+	let buf = new Uint8Array(ogg), results = [], sync = true
+	for (let off = 0, size = 1; off < buf.length; off += size, size = Math.min(size * 3, 7919)) {
+		let chunk = buf.subarray(off, off + size)
+		let r = dec.decode(off ? chunk : chunk.slice().buffer)
+		sync &&= !(r instanceof Promise)
+		results.push(r)
+	}
+	ok(sync, 'decode returns value, not promise')
+	let tail = dec.flush()
+	ok(!(tail instanceof Promise), 'flush returns value, not promise')
+	results.push(tail)
+	let total = results.reduce((n, r) => n + (r.channelData[0]?.length || 0), 0)
+	ok(total === whole.channelData[0].length, 'chunked sync decode matches whole-file length')
+	let threw = false
+	try { dec.decode(buf) } catch { threw = true }
+	ok(threw, 'decode after flush throws')
 	dec.free()
-	ok((a.channelData[0]?.length || 0) > 0, 'decoded samples')
+	threw = false
+	try { dec.decode(buf) } catch { threw = true }
+	ok(threw, 'decode after free throws')
+}
+
+console.log('Vorbis granule trim clamp')
+{
+	// Last-page granule claiming fewer samples than already decoded must clamp to
+	// empty output, not subarray with a negative end.
+	let buf = new Uint8Array(ogg), last = -1
+	for (let i = 0; i < buf.length - 3; i++)
+		if (buf[i] === 0x4f && buf[i + 1] === 0x67 && buf[i + 2] === 0x67 && buf[i + 3] === 0x53) last = i
+	let patched = buf.slice()
+	patched[last + 6] = 1
+	for (let i = 7; i < 14; i++) patched[last + i] = 0
+	let dec = await decoder()
+	let head = dec.decode(patched.subarray(0, last))
+	let tail = dec.decode(patched.subarray(last))
+	let flushed = dec.flush()
+	dec.free()
+	for (let r of [head, tail, flushed]) {
+		ok(!(r.samplesDecoded < 0), 'samplesDecoded never negative: ' + r.samplesDecoded)
+		ok(r.channelData.every(ch => ch.length === (r.channelData[0]?.length || 0)), 'channels equal length')
+	}
 }
 
 // ===== metadata (Vorbis comments) =====

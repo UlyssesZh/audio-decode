@@ -1,6 +1,6 @@
 {
   "name": "@audio/decode-wma",
-  "version": "1.2.3",
+  "version": "1.3.0",
   "description": "Decode WMA audio via RockBox WASM",
   "type": "module",
   "main": "decode-wma.js",

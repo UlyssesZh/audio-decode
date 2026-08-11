@@ -4,7 +4,7 @@
  *   PCM 8/16/24/32-bit int, 32/64-bit float, G.711 A-law / µ-law,
  *   plus WAVE_FORMAT_EXTENSIBLE wrapping any of the above.
  *
- * let { channelData, sampleRate } = await decode(wavbuf)
+ * let { channelData, sampleRate } = decode(wavbuf)
  */
 
 const EMPTY = Object.freeze({ channelData: [], sampleRate: 0 })
@@ -35,30 +35,32 @@ for (let i = 0; i < 256; i++) {
 	ULAW_TBL[i] = (ux & 0x80) ? (132 - val) : (val - 132)
 }
 
-export default async function decode(src) {
-	let dec = await decoder()
+/** Decode a complete WAV file synchronously. */
+export default function decode(src) {
+	let dec = decoder()
 	try { return dec.decode(src instanceof Uint8Array ? src : new Uint8Array(src)) }
 	finally { dec.free() }
 }
 
-export async function decoder() {
+/** Create a synchronous streaming decoder. */
+export function decoder() {
 	let hdr = null, left = null, freed = false, dataLeft = Infinity
 	return {
 		decode(data) {
 			if (freed) throw Error('Decoder already freed')
-			if (!data?.length) return EMPTY
+			if (!data || !data.byteLength) return EMPTY
 			let chunk = data instanceof Uint8Array ? data : new Uint8Array(data)
 			if (left) { chunk = cat(left, chunk); left = null }
 			if (!hdr) {
 				hdr = scanWavHdr(chunk)
 				if (!hdr) { left = chunk.slice(); return EMPTY }
-				// 0 / 0xFFFFFFFF are streaming placeholders — read to end
+				// 0 / 0xFFFFFFFF are streaming placeholders; read to the end
 				dataLeft = hdr.dataSize > 0 && hdr.dataSize < 0xFFFFFFFF ? hdr.dataSize : Infinity
 				chunk = chunk.subarray(hdr.dataStart)
 			}
-			if (dataLeft <= 0) return EMPTY // past the data chunk — ignore trailing chunks
+			if (dataLeft <= 0) return EMPTY // Ignore chunks after the declared audio data.
 			let fb = hdr.blockSize
-			let avail = Math.min(chunk.length, dataLeft) // don't read past the declared data size
+			let avail = Math.min(chunk.length, dataLeft) // Do not read past the declared data size.
 			let complete = Math.floor(avail / fb) * fb
 			if (!complete) { if (chunk.length && dataLeft > chunk.length) left = chunk.slice(); return EMPTY }
 			dataLeft -= complete
