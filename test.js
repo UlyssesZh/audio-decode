@@ -10,6 +10,8 @@ import webm from 'audio-lena/webm';
 import aac from 'audio-lena/aac';
 import t, { is } from 'tst';
 import m4a from 'audio-lena/m4a';
+import { decoder as vorbisDecoder } from '@audio/decode-vorbis';
+import { decoder as flacDecoder } from '@audio/decode-flac';
 
 const isNode = typeof process !== 'undefined' && process.versions?.node
 const skip = (msg) => is(true, true, 'skip: ' + msg)
@@ -20,6 +22,8 @@ async function readFile(url) {
 }
 
 const qoa = await readFile(new URL('./fixtures/qoa-sample.qoa', import.meta.url))
+const shortOgg = await readFile(new URL('./packages/decode-vorbis/fixtures/short.ogg', import.meta.url))
+const shortOggFlac = await readFile(new URL('./packages/decode-flac/fixtures/mono.oga', import.meta.url))
 const amrNb = isNode ? await readFile(new URL('./packages/decode-amr/fixtures/test-nb.amr', import.meta.url)) : null
 const wmaStereo = isNode ? await readFile(new URL('./packages/decode-wma/fixtures/stereo.wma', import.meta.url)) : null
 
@@ -52,12 +56,37 @@ t('ogg vorbis', async () => {
 	is(near(rms(r.channelData[0]), 0.13, 0.01), true, 'rms')
 })
 
+t('reusable compact ogg vorbis', async () => {
+	let dec = await vorbisDecoder()
+	for (let i = 0; i < 3; i++) {
+		let input = i ? shortOgg : shortOgg.buffer.slice(shortOgg.byteOffset, shortOgg.byteOffset + shortOgg.byteLength)
+		let r = dec.decode(input)
+		is(r instanceof Promise, false, 'synchronous result')
+		is(r.channelData.length, 2)
+		is(r.channelData[0].length, 13248)
+		is(r.sampleRate, 44100)
+	}
+	dec.free()
+})
+
 t('flac', async () => {
 	let r = await decode(flac)
 	is(r.sampleRate, 44100)
 	is(near(dur(r), 12.27), true, 'duration')
 	// flac is lossless, must match wav exactly
 	is(near(rms(r.channelData[0]), 0.1298, 0.001), true, 'rms lossless')
+})
+
+t('reusable complete ogg flac', async () => {
+	let dec = await flacDecoder()
+	for (let i = 0; i < 2; i++) {
+		let r = dec.decode(shortOggFlac)
+		is(r instanceof Promise, false, 'synchronous result')
+		is(r.channelData.length, 1)
+		is(r.channelData[0].length, 12000)
+		is(r.sampleRate, 48000)
+	}
+	dec.free()
 })
 
 t('opus', async () => {

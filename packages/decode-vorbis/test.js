@@ -3,6 +3,8 @@ import { parseMeta } from './meta.js'
 import { readFileSync } from 'fs'
 import ogg from 'audio-lena/ogg'
 
+const short = readFileSync(new URL('./fixtures/short.ogg', import.meta.url))
+
 let pass = 0, fail = 0
 function ok(cond, msg) {
 	if (cond) { pass++; console.log('  ok', msg) }
@@ -18,6 +20,42 @@ ok(whole.channelData.length >= 1, 'has channels')
 ok(whole.sampleRate === 44100, 'sampleRate 44100')
 ok(near(whole.channelData[0].length / whole.sampleRate, 12.27), 'duration ~12.27s')
 ok(rms(whole.channelData[0]) > 0.05, 'has audio content')
+
+// Compact Ogg streams may keep their only audio page buffered until EOF.
+console.log('Vorbis reusable whole-file decoder')
+{
+	let expected = await decode(short)
+	ok(expected.channelData.length === 2, 'compact stream has two channels')
+	ok(expected.sampleRate === 44100, 'compact stream sampleRate 44100')
+	ok(expected.channelData.every(channel => channel.length === 13248), 'compact stream has complete PCM')
+	let dec = await decoder()
+	for (let i = 0; i < 3; i++) {
+		let input = i ? new Uint8Array(short) : short.buffer.slice(short.byteOffset, short.byteOffset + short.byteLength)
+		let result = dec.decode(input)
+		ok(!(result instanceof Promise), 'complete-file decode returns a value')
+		ok(result.channelData.length === 2 && result.sampleRate === 44100, 'complete-file decode returns valid format')
+		ok(result.channelData.every(channel => channel.length === 13248), 'complete-file decode returns all samples')
+		ok(result.channelData[0].every((value, index) => value === expected.channelData[0][index]), 'reused decoder returns identical PCM')
+	}
+	let mono = dec.decode(ogg)
+	ok(mono.channelData.length === whole.channelData.length && mono.sampleRate === whole.sampleRate, 'reused decoder accepts a different stream format')
+	ok(mono.channelData[0].every((value, index) => value === whole.channelData[0][index]), 'different stream format returns identical PCM')
+	let stereo = dec.decode(short)
+	ok(stereo.channelData.length === 2 && stereo.channelData[0].length === 13248, 'reused decoder switches back to the first format')
+	ok(!dec.flush().channelData.length, 'flush after a complete file is empty')
+	let threw = false
+	try { dec.decode(short) } catch { threw = true }
+	ok(threw, 'flush after a complete file is terminal')
+	dec.free()
+
+	let stream = await decoder()
+	let beforeEof = stream.decode(short.subarray(0, -1))
+	let eof = stream.decode(short.subarray(-1))
+	let tail = stream.flush()
+	ok(!beforeEof.channelData.length && !eof.channelData.length, 'split final page stays buffered until flush')
+	ok(tail.channelData.length === 2 && tail.channelData.every(channel => channel.length === 13248), 'split final page flushes complete PCM')
+	stream.free()
+}
 
 // one async init, synchronous decode calls
 console.log('Vorbis streaming')

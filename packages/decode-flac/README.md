@@ -14,7 +14,9 @@ let tail = dec.flush()
 dec.free()
 ```
 
-`decoder()` is asynchronous. Its `decode()` and `flush()` methods are synchronous. `flush()` ends the stream.
+`decoder()` initializes asynchronously. `decode()` and `flush()` are synchronous.
+`decode()` accepts consecutive complete Ogg files and raw FLAC files whose STREAMINFO
+block declares the sample total. For chunked input, `flush()` ends the decoder.
 
 ## License
 

@@ -999,7 +999,7 @@ var MPEGHeader = class _MPEGHeader extends CodecHeader {
     if (header2[emphasis] === reserved) return null;
     header2[bitDepth] = 16;
     {
-      const { length: length2, frameLength: frameLength2, samples: samples2, ...codecUpdateFields } = header2;
+      const { length: length2, frameLength: frameLength2, samples: samples3, ...codecUpdateFields } = header2;
       headerCache[setHeader](key, header2, codecUpdateFields);
     }
     return new _MPEGHeader(header2);
@@ -1034,8 +1034,8 @@ var MPEGFrame = class _MPEGFrame extends CodecFrame {
       readOffset
     );
   }
-  constructor(header2, frame2, samples2) {
-    super(header2, frame2, samples2);
+  constructor(header2, frame2, samples3) {
+    super(header2, frame2, samples3);
   }
 };
 
@@ -1157,7 +1157,7 @@ var AACHeader = class _AACHeader extends CodecHeader {
           profileBits: profileBits2,
           sampleRateBits: sampleRateBits2,
           frameLength: frameLength2,
-          samples: samples2,
+          samples: samples3,
           numberAACFrames: numberAACFrames2,
           ...codecUpdateFields
         } = header2;
@@ -1211,8 +1211,8 @@ var AACFrame = class _AACFrame extends CodecFrame {
       readOffset
     );
   }
-  constructor(header2, frame2, samples2) {
-    super(header2, frame2, samples2);
+  constructor(header2, frame2, samples3) {
+    super(header2, frame2, samples3);
   }
 };
 
@@ -1456,7 +1456,7 @@ var FLACHeader = class _FLACHeader extends CodecHeader {
           blockingStrategyBits: blockingStrategyBits2,
           frameNumber: frameNumber2,
           sampleNumber: sampleNumber2,
-          samples: samples2,
+          samples: samples3,
           sampleRateBits: sampleRateBits2,
           blockSizeBits: blockSizeBits2,
           crc: crc2,
@@ -1672,8 +1672,8 @@ var OggPage = class _OggPage extends Frame {
 
 // ../../node_modules/codec-parser/src/codecs/opus/OpusFrame.js
 var OpusFrame = class extends CodecFrame {
-  constructor(data3, header2, samples2) {
-    super(header2, data3, samples2);
+  constructor(data3, header2, samples3) {
+    super(header2, data3, samples3);
   }
 };
 
@@ -1860,12 +1860,12 @@ var OpusParser = class extends Parser {
         if (header2) {
           if (this._preSkipRemaining === null)
             this._preSkipRemaining = header2[preSkip];
-          let samples2 = header2[frameSize] * header2[frameCount] / 1e3 * header2[sampleRate];
+          let samples3 = header2[frameSize] * header2[frameCount] / 1e3 * header2[sampleRate];
           if (this._preSkipRemaining > 0) {
-            this._preSkipRemaining -= samples2;
-            samples2 = this._preSkipRemaining < 0 ? -this._preSkipRemaining : 0;
+            this._preSkipRemaining -= samples3;
+            samples3 = this._preSkipRemaining < 0 ? -this._preSkipRemaining : 0;
           }
-          return new OpusFrame(segment, header2, samples2);
+          return new OpusFrame(segment, header2, samples3);
         }
         this._codecParser[logError2](
           "Failed to parse Ogg Opus Header",
@@ -1879,8 +1879,8 @@ var OpusParser = class extends Parser {
 
 // ../../node_modules/codec-parser/src/codecs/vorbis/VorbisFrame.js
 var VorbisFrame = class extends CodecFrame {
-  constructor(data3, header2, samples2) {
-    super(header2, data3, samples2);
+  constructor(data3, header2, samples3) {
+    super(header2, data3, samples3);
   }
 };
 
@@ -2417,6 +2417,7 @@ var codec_parser_default = CodecParser;
 var codecFrames2 = codecFrames;
 var data2 = data;
 var isLastPage2 = isLastPage;
+var samples2 = samples;
 var totalSamples2 = totalSamples;
 
 // ../../node_modules/@wasm-audio-decoders/flac/src/EmscriptenWasm.js
@@ -2964,7 +2965,7 @@ async function decode(src) {
   try {
     let a = dec.decode(buf);
     let b = dec.flush();
-    return b?.channelData?.length ? merge(a, b) : a;
+    return hasAudio(b) ? merge(a, b) : a;
   } finally {
     dec.free();
   }
@@ -2972,12 +2973,34 @@ async function decode(src) {
 async function decoder() {
   let upstream = new FLACDecoder();
   await upstream.ready;
-  let codec2 = upstream._decoder;
-  if (typeof codec2?.decodeFrames !== "function") {
+  let codec2 = upstream._decoder, wasm = codec2?._common?.wasm;
+  let outputs = [
+    codec2?._channels,
+    codec2?._sampleRate,
+    codec2?._bitsPerSample,
+    codec2?._samplesDecoded,
+    codec2?._outputBufferPtr,
+    codec2?._outputBufferLen,
+    codec2?._errorStringPtr,
+    codec2?._stateStringPtr
+  ];
+  if (typeof codec2?.decodeFrames !== "function" || typeof wasm?.create_decoder !== "function" || typeof wasm.destroy_decoder !== "function" || outputs.some((output) => !output?.buf || output.ptr == null)) {
     upstream.free();
     throw Error("Unsupported @wasm-audio-decoders/flac internals");
   }
-  let parser = null, prefix = null, ogg = false, total2 = 0, ended = false, freed = false;
+  let parser = null, prefix = null, ogg = false, total2 = 0, fresh = true, ended = false, freed = false;
+  let resetStream = () => {
+    wasm.destroy_decoder(codec2._decoder);
+    codec2._inputBytes = codec2._outputSamples = codec2._frameNumber = 0;
+    for (let output of outputs) output.buf.fill(0);
+    codec2._decoder = wasm.create_decoder(...outputs.map((output) => output.ptr));
+    if (!codec2._decoder) throw Error("Could not reset FLAC decoder");
+    parser = null;
+    prefix = null;
+    ogg = false;
+    total2 = 0;
+    fresh = true;
+  };
   let decodeItems = (items) => {
     if (!items.length) return null;
     if (!ogg) return codec2.decodeFrames(items.map((f) => f[data2] || f));
@@ -3003,6 +3026,8 @@ async function decoder() {
     if (!chunk) return EMPTY;
     let buf = chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk);
     if (!buf.length) return EMPTY;
+    let wasFresh = fresh;
+    fresh = false;
     if (!parser) {
       if (prefix) buf = concatBytes(prefix, buf);
       if (buf.length < 4) {
@@ -3011,15 +3036,18 @@ async function decoder() {
       }
       prefix = null;
       ogg = buf[0] === 79 && buf[1] === 103 && buf[2] === 103 && buf[3] === 83;
-      parser = new codec_parser_default(ogg ? "audio/ogg" : "audio/flac", {
-        onCodec: (c) => {
-          if (c !== "flac") throw Error("@audio/decode-flac does not support this codec " + c);
-        },
-        enableFrameCRC32: false
-      });
+      parser = createParser(ogg);
+    }
+    if (wasFresh) {
+      let items = ogg && isCompleteOggStream(buf) ? [...parser.parseAll(buf)] : !ogg ? completeFlacFrames(buf) : null;
+      if (items) {
+        let r2 = decodeItems(items);
+        resetStream();
+        return hasAudio(r2) ? r2 : EMPTY;
+      }
     }
     let r = decodeItems([...parser.parseChunk(buf)]);
-    return r?.channelData?.length ? r : EMPTY;
+    return hasAudio(r) ? r : EMPTY;
   };
   upstream.flush = () => {
     if (freed || ended) return EMPTY;
@@ -3030,7 +3058,7 @@ async function decoder() {
     }
     try {
       let r = decodeItems([...parser.flush()]);
-      return r?.channelData?.length ? r : EMPTY;
+      return hasAudio(r) ? r : EMPTY;
     } finally {
       parser = null;
       prefix = null;
@@ -3046,6 +3074,51 @@ async function decoder() {
   };
   return upstream;
 }
+function createParser(ogg) {
+  return new codec_parser_default(ogg ? "audio/ogg" : "audio/flac", {
+    onCodec: (codec2) => {
+      if (codec2 !== "flac") throw Error("@audio/decode-flac does not support this codec " + codec2);
+    },
+    enableFrameCRC32: false
+  });
+}
+function completeFlacFrames(buf) {
+  let expected = flacTotalSamples(buf);
+  if (!expected) return null;
+  try {
+    let frames = [...createParser(false).parseAll(buf)];
+    let parsed = frames.reduce((total2, frame2) => total2 + (frame2[samples2] || 0), 0);
+    return parsed === expected ? frames : null;
+  } catch {
+    return null;
+  }
+}
+function flacTotalSamples(buf) {
+  if (buf.length < 42 || buf[0] !== 102 || buf[1] !== 76 || buf[2] !== 97 || buf[3] !== 67 || (buf[4] & 127) !== 0 || (buf[5] << 16 | buf[6] << 8 | buf[7]) < 34)
+    return 0;
+  return (buf[21] & 15) * 4294967296 + buf[22] * 16777216 + buf[23] * 65536 + buf[24] * 256 + buf[25];
+}
+function isCompleteOggStream(buf) {
+  let offset = 0, first = true;
+  while (offset < buf.length) {
+    if (offset + 27 > buf.length || buf[offset] !== 79 || buf[offset + 1] !== 103 || buf[offset + 2] !== 103 || buf[offset + 3] !== 83 || buf[offset + 4] !== 0)
+      return false;
+    let flags = buf[offset + 5], segments2 = buf[offset + 26];
+    if (first && !(flags & 2)) return false;
+    let body = offset + 27 + segments2;
+    if (body > buf.length) return false;
+    let end = body;
+    for (let i = offset + 27; i < body; i++) end += buf[i];
+    if (end > buf.length) return false;
+    if (flags & 4) return end === buf.length;
+    offset = end;
+    first = false;
+  }
+  return false;
+}
+function hasAudio(result) {
+  return !!result?.channelData?.[0]?.length;
+}
 function concatBytes(a, b) {
   let r = new Uint8Array(a.length + b.length);
   r.set(a);
@@ -3053,8 +3126,8 @@ function concatBytes(a, b) {
   return r;
 }
 function merge(a, b) {
-  if (!b?.channelData?.length) return a;
-  if (!a?.channelData?.length) return b;
+  if (!hasAudio(b)) return a;
+  if (!hasAudio(a)) return b;
   return {
     channelData: a.channelData.map((ch, i) => {
       let bc = b.channelData[i] || b.channelData[0];

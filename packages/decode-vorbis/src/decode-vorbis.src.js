@@ -13,7 +13,7 @@ export default async function decode(src) {
 	try {
 		let a = dec.decode(buf)
 		let b = dec.flush()
-		return b?.channelData?.length ? merge(a, b) : a
+		return hasAudio(b) ? merge(a, b) : a
 	} finally { dec.free() }
 }
 
@@ -21,16 +21,41 @@ export async function decoder() {
 	let upstream = new OggVorbisDecoder()
 	await upstream.ready
 	// Upstream has no public synchronous API.
-	let codec = upstream._decoder
-	if (typeof codec?.sendSetupHeader !== 'function' || typeof codec.initDsp !== 'function' || typeof codec.decodePackets !== 'function') {
+	let codec = upstream._decoder, wasm = codec?._common?.wasm
+	if (typeof codec?.sendSetupHeader !== 'function' || typeof codec.initDsp !== 'function' ||
+		typeof codec.decodePackets !== 'function' || typeof wasm?.malloc !== 'function' ||
+		typeof wasm.free !== 'function' || !(wasm.HEAP instanceof ArrayBuffer)) {
 		upstream.free()
 		throw Error('Unsupported @wasm-audio-decoders/ogg-vorbis internals')
 	}
-	let parser = new CodecParser('audio/ogg', {
+	// The upstream reset reinstantiates WASM asynchronously. Keep a pristine
+	// image through the allocator's initial heap boundary so the same instance
+	// can be restored synchronously without retaining a second WASM heap.
+	let heapEnd = wasm.malloc(1)
+	if (!heapEnd) { upstream.free(); throw Error('Could not initialize Ogg Vorbis decoder') }
+	wasm.free(heapEnd)
+	heapEnd = Math.min(wasm.HEAP.byteLength, Math.ceil((heapEnd + 65536) / 65536) * 65536)
+	let initialMemory = new Uint8Array(wasm.HEAP, 0, heapEnd).slice()
+
+	let createParser = () => new CodecParser('audio/ogg', {
 		onCodec: c => { if (c !== 'vorbis') throw Error('@audio/decode-vorbis does not support this codec ' + c) },
 		enableFrameCRC32: false
 	})
-	let setup = true, total = 0, ended = false, freed = false
+	let parser = createParser(), setup = true, total = 0, fresh = true
+	let resetPending = false, ended = false, freed = false
+
+	let resetCodec = () => {
+		if (wasm.HEAP.byteLength < initialMemory.length)
+			throw Error('Could not reset Ogg Vorbis decoder')
+		new Uint8Array(wasm.HEAP, 0, initialMemory.length).set(initialMemory)
+		codec._firstPage = true
+		codec._frameNumber = codec._inputBytes = codec._outputSamples = 0
+	}
+
+	let startStream = () => {
+		resetCodec()
+		parser = createParser(); setup = true; total = 0; fresh = true; resetPending = false
+	}
 
 	let decodePages = (pages) => {
 		if (!pages.length) return null
@@ -49,6 +74,9 @@ export async function decoder() {
 			packets.push(...page[codecFrames].map(f => f[data]))
 		}
 
+		// Calling the low-level decoder without packets exposes uninitialized
+		// channel and sample-rate output pointers.
+		if (!packets.length) return null
 		let decoded = codec.decodePackets(packets)
 		total += decoded.samplesDecoded
 		let page = pages[pages.length - 1]
@@ -71,17 +99,29 @@ export async function decoder() {
 		if (!chunk) return EMPTY
 		let buf = chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk)
 		if (!buf.length) return EMPTY
+		if (resetPending) startStream()
+
+		if (fresh && isCompleteOggStream(buf)) {
+			let r = decodePages([...parser.parseAll(buf)])
+			// Keep this initialized codec alive until another stream arrives. A
+			// newly created upstream codec cannot be safely freed before setup.
+			parser = null; resetPending = true
+			return hasAudio(r) ? r : EMPTY
+		}
+
+		fresh = false
 		let r = decodePages([...parser.parseChunk(buf)])
-		return r?.channelData?.length ? r : EMPTY
+		return hasAudio(r) ? r : EMPTY
 	}
 
-	// Synchronous flush is terminal; create another decoder for another stream.
+	// Complete files do not need flush; chunked flush is terminal.
 	upstream.flush = () => {
 		if (freed || ended) return EMPTY
 		ended = true
+		if (resetPending) { parser = null; return EMPTY }
 		try {
 			let r = decodePages([...parser.flush()])
-			return r?.channelData?.length ? r : EMPTY
+			return hasAudio(r) ? r : EMPTY
 		} finally { parser = null }
 	}
 
@@ -89,14 +129,37 @@ export async function decoder() {
 	upstream.free = () => {
 		if (freed) return
 		freed = true; parser = null
-		free()
+		free(); initialMemory = null
 	}
 	return upstream
 }
 
+function hasAudio(result) {
+	return !!result?.channelData?.[0]?.length
+}
+
+function isCompleteOggStream(buf) {
+	let offset = 0, first = true
+	while (offset < buf.length) {
+		if (offset + 27 > buf.length || buf[offset] !== 0x4f || buf[offset + 1] !== 0x67 ||
+			buf[offset + 2] !== 0x67 || buf[offset + 3] !== 0x53 || buf[offset + 4] !== 0)
+			return false
+		let flags = buf[offset + 5], segments = buf[offset + 26]
+		if (first && !(flags & 2)) return false
+		let body = offset + 27 + segments
+		if (body > buf.length) return false
+		let end = body
+		for (let i = offset + 27; i < body; i++) end += buf[i]
+		if (end > buf.length) return false
+		if (flags & 4) return end === buf.length
+		offset = end; first = false
+	}
+	return false
+}
+
 function merge(a, b) {
-	if (!b?.channelData?.length) return a
-	if (!a?.channelData?.length) return b
+	if (!hasAudio(b)) return a
+	if (!hasAudio(a)) return b
 	return {
 		channelData: a.channelData.map((ch, i) => {
 			let bc = b.channelData[i] || b.channelData[0]

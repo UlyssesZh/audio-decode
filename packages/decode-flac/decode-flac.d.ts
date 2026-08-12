@@ -6,7 +6,7 @@ export interface AudioData {
 interface FlacDecoder {
   /** Decode a chunk synchronously. */
   decode(data: Uint8Array | ArrayBuffer): AudioData;
-  /** Finish the stream synchronously. Create a new decoder for another stream. */
+  /** Finish chunked input synchronously. This ends the decoder. */
   flush(): AudioData;
   free(): void;
 }

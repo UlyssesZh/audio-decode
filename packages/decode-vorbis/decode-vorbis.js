@@ -2954,7 +2954,7 @@ async function decode(src) {
   try {
     let a = dec.decode(buf);
     let b = dec.flush();
-    return b?.channelData?.length ? merge(a, b) : a;
+    return hasAudio(b) ? merge(a, b) : a;
   } finally {
     dec.free();
   }
@@ -2962,18 +2962,42 @@ async function decode(src) {
 async function decoder() {
   let upstream = new OggVorbisDecoder();
   await upstream.ready;
-  let codec2 = upstream._decoder;
-  if (typeof codec2?.sendSetupHeader !== "function" || typeof codec2.initDsp !== "function" || typeof codec2.decodePackets !== "function") {
+  let codec2 = upstream._decoder, wasm = codec2?._common?.wasm;
+  if (typeof codec2?.sendSetupHeader !== "function" || typeof codec2.initDsp !== "function" || typeof codec2.decodePackets !== "function" || typeof wasm?.malloc !== "function" || typeof wasm.free !== "function" || !(wasm.HEAP instanceof ArrayBuffer)) {
     upstream.free();
     throw Error("Unsupported @wasm-audio-decoders/ogg-vorbis internals");
   }
-  let parser = new codec_parser_default("audio/ogg", {
+  let heapEnd = wasm.malloc(1);
+  if (!heapEnd) {
+    upstream.free();
+    throw Error("Could not initialize Ogg Vorbis decoder");
+  }
+  wasm.free(heapEnd);
+  heapEnd = Math.min(wasm.HEAP.byteLength, Math.ceil((heapEnd + 65536) / 65536) * 65536);
+  let initialMemory = new Uint8Array(wasm.HEAP, 0, heapEnd).slice();
+  let createParser = () => new codec_parser_default("audio/ogg", {
     onCodec: (c) => {
       if (c !== "vorbis") throw Error("@audio/decode-vorbis does not support this codec " + c);
     },
     enableFrameCRC32: false
   });
-  let setup = true, total2 = 0, ended = false, freed = false;
+  let parser = createParser(), setup = true, total2 = 0, fresh = true;
+  let resetPending = false, ended = false, freed = false;
+  let resetCodec = () => {
+    if (wasm.HEAP.byteLength < initialMemory.length)
+      throw Error("Could not reset Ogg Vorbis decoder");
+    new Uint8Array(wasm.HEAP, 0, initialMemory.length).set(initialMemory);
+    codec2._firstPage = true;
+    codec2._frameNumber = codec2._inputBytes = codec2._outputSamples = 0;
+  };
+  let startStream = () => {
+    resetCodec();
+    parser = createParser();
+    setup = true;
+    total2 = 0;
+    fresh = true;
+    resetPending = false;
+  };
   let decodePages = (pages) => {
     if (!pages.length) return null;
     let packets = [];
@@ -2989,6 +3013,7 @@ async function decoder() {
       }
       packets.push(...page3[codecFrames2].map((f) => f[data2]));
     }
+    if (!packets.length) return null;
     let decoded = codec2.decodePackets(packets);
     total2 += decoded.samplesDecoded;
     let page2 = pages[pages.length - 1];
@@ -3010,15 +3035,27 @@ async function decoder() {
     if (!chunk) return EMPTY;
     let buf = chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk);
     if (!buf.length) return EMPTY;
+    if (resetPending) startStream();
+    if (fresh && isCompleteOggStream(buf)) {
+      let r2 = decodePages([...parser.parseAll(buf)]);
+      parser = null;
+      resetPending = true;
+      return hasAudio(r2) ? r2 : EMPTY;
+    }
+    fresh = false;
     let r = decodePages([...parser.parseChunk(buf)]);
-    return r?.channelData?.length ? r : EMPTY;
+    return hasAudio(r) ? r : EMPTY;
   };
   upstream.flush = () => {
     if (freed || ended) return EMPTY;
     ended = true;
+    if (resetPending) {
+      parser = null;
+      return EMPTY;
+    }
     try {
       let r = decodePages([...parser.flush()]);
-      return r?.channelData?.length ? r : EMPTY;
+      return hasAudio(r) ? r : EMPTY;
     } finally {
       parser = null;
     }
@@ -3029,12 +3066,34 @@ async function decoder() {
     freed = true;
     parser = null;
     free2();
+    initialMemory = null;
   };
   return upstream;
 }
+function hasAudio(result) {
+  return !!result?.channelData?.[0]?.length;
+}
+function isCompleteOggStream(buf) {
+  let offset = 0, first = true;
+  while (offset < buf.length) {
+    if (offset + 27 > buf.length || buf[offset] !== 79 || buf[offset + 1] !== 103 || buf[offset + 2] !== 103 || buf[offset + 3] !== 83 || buf[offset + 4] !== 0)
+      return false;
+    let flags = buf[offset + 5], segments2 = buf[offset + 26];
+    if (first && !(flags & 2)) return false;
+    let body = offset + 27 + segments2;
+    if (body > buf.length) return false;
+    let end = body;
+    for (let i = offset + 27; i < body; i++) end += buf[i];
+    if (end > buf.length) return false;
+    if (flags & 4) return end === buf.length;
+    offset = end;
+    first = false;
+  }
+  return false;
+}
 function merge(a, b) {
-  if (!b?.channelData?.length) return a;
-  if (!a?.channelData?.length) return b;
+  if (!hasAudio(b)) return a;
+  if (!hasAudio(a)) return b;
   return {
     channelData: a.channelData.map((ch, i) => {
       let bc = b.channelData[i] || b.channelData[0];
