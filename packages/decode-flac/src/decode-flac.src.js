@@ -30,7 +30,8 @@ export async function decoder() {
 		upstream.free()
 		throw Error('Unsupported @wasm-audio-decoders/flac internals')
 	}
-	let parser = null, prefix = null, ogg = false, total = 0, fresh = true, ended = false, freed = false
+	let parser = null, prefix = null, lookahead = null, ogg = false, total = 0, fresh = true
+	let pendingRaw = false, duplicateFrames = 0, ended = false, freed = false
 
 	let resetStream = () => {
 		wasm.destroy_decoder(codec._decoder)
@@ -38,10 +39,15 @@ export async function decoder() {
 		for (let output of outputs) output.buf.fill(0)
 		codec._decoder = wasm.create_decoder(...outputs.map(output => output.ptr))
 		if (!codec._decoder) throw Error('Could not reset FLAC decoder')
-		parser = null; prefix = null; ogg = false; total = 0; fresh = true
+		parser = null; prefix = null; lookahead = null; ogg = false; total = 0; fresh = true
+		pendingRaw = false; duplicateFrames = 0
 	}
 
 	let decodeItems = (items) => {
+		if (duplicateFrames && !ogg) {
+			let skip = Math.min(duplicateFrames, items.length)
+			items = items.slice(skip); duplicateFrames -= skip
+		}
 		if (!items.length) return null
 		if (!ogg) return codec.decodeFrames(items.map(f => f[data] || f))
 
@@ -68,6 +74,17 @@ export async function decoder() {
 		if (!chunk) return EMPTY
 		let buf = chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk)
 		if (!buf.length) return EMPTY
+
+		// A zero-total raw stream has no end marker. If more data follows, its
+		// first four bytes distinguish another file from a frame continuation.
+		if (pendingRaw) {
+			if (lookahead) buf = concatBytes(lookahead, buf)
+			if (buf.length < 4) { lookahead = buf.slice(); return EMPTY }
+			lookahead = null
+			if (isStreamStart(buf)) resetStream()
+			else pendingRaw = false
+		}
+
 		let wasFresh = fresh
 		fresh = false
 
@@ -81,12 +98,24 @@ export async function decoder() {
 		}
 
 		if (wasFresh) {
-			let items = ogg && isCompleteOggStream(buf) ? [...parser.parseAll(buf)] :
-				!ogg ? completeFlacFrames(buf) : null
-			if (items) {
-				let r = decodeItems(items)
+			if (ogg && isCompleteOggStream(buf)) {
+				let r = decodeItems([...parser.parseAll(buf)])
 				resetStream()
 				return hasAudio(r) ? r : EMPTY
+			}
+			if (!ogg) {
+				let initial = parseInitialFlac(buf)
+				if (initial) {
+					let primed = 0
+					if (!initial.total) for (let frame of parser.parseChunk(buf)) if (frame) primed++
+					let r = decodeItems(initial.frames)
+					if (initial.total) resetStream()
+					else {
+						duplicateFrames = Math.max(0, initial.frames.length - primed)
+						pendingRaw = true
+					}
+					return hasAudio(r) ? r : EMPTY
+				}
 			}
 		}
 
@@ -98,17 +127,19 @@ export async function decoder() {
 	upstream.flush = () => {
 		if (freed || ended) return EMPTY
 		ended = true
-		if (!parser) { prefix = null; return EMPTY }
+		if (!parser) { prefix = lookahead = null; return EMPTY }
 		try {
-			let r = decodeItems([...parser.flush()])
+			let items = lookahead ? [...parser.parseChunk(lookahead), ...parser.flush()] : [...parser.flush()]
+			lookahead = null
+			let r = decodeItems(items)
 			return hasAudio(r) ? r : EMPTY
-		} finally { parser = null; prefix = null }
+		} finally { parser = null; prefix = lookahead = null }
 	}
 
 	let free = upstream.free.bind(upstream)
 	upstream.free = () => {
 		if (freed) return
-		freed = true; parser = null; prefix = null
+		freed = true; parser = null; prefix = lookahead = null
 		free()
 	}
 	return upstream
@@ -121,22 +152,36 @@ function createParser(ogg) {
 	})
 }
 
-function completeFlacFrames(buf) {
-	let expected = flacTotalSamples(buf)
-	if (!expected) return null
+function parseInitialFlac(buf) {
+	let info = flacInfo(buf)
+	if (!info) return null
 	try {
 		let frames = [...createParser(false).parseAll(buf)]
+		if (!frames.length) return null
 		let parsed = frames.reduce((total, frame) => total + (frame[samples] || 0), 0)
-		return parsed === expected ? frames : null
+		return !info.total || parsed === info.total ? { frames, total: info.total } : null
 	} catch { return null }
 }
 
-function flacTotalSamples(buf) {
+function flacInfo(buf) {
 	if (buf.length < 42 || buf[0] !== 0x66 || buf[1] !== 0x4c || buf[2] !== 0x61 ||
 		buf[3] !== 0x43 || (buf[4] & 0x7f) !== 0 || (buf[5] << 16 | buf[6] << 8 | buf[7]) < 34)
-		return 0
-	return (buf[21] & 15) * 0x100000000 + buf[22] * 0x1000000 +
+		return null
+	let total = (buf[21] & 15) * 0x100000000 + buf[22] * 0x1000000 +
 		buf[23] * 0x10000 + buf[24] * 0x100 + buf[25]
+	for (let offset = 4; offset + 4 <= buf.length;) {
+		let last = buf[offset] & 0x80
+		let length = buf[offset + 1] * 0x10000 + buf[offset + 2] * 0x100 + buf[offset + 3]
+		offset += 4 + length
+		if (offset > buf.length) return null
+		if (last) return { total }
+	}
+	return null
+}
+
+function isStreamStart(buf) {
+	return (buf[0] === 0x66 && buf[1] === 0x4c && buf[2] === 0x61 && buf[3] === 0x43) ||
+		(buf[0] === 0x4f && buf[1] === 0x67 && buf[2] === 0x67 && buf[3] === 0x53)
 }
 
 function isCompleteOggStream(buf) {

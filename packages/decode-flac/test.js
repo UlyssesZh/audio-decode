@@ -1,5 +1,6 @@
 import decode, { decoder } from './decode-flac.js'
 import { readFileSync } from 'node:fs'
+import CodecParser, { data } from 'codec-parser'
 import flac from 'audio-lena/flac'
 
 const oggFlac = readFileSync(new URL('./fixtures/mono.oga', import.meta.url))
@@ -11,6 +12,17 @@ function ok(cond, msg) {
 }
 function near(a, b, tol = 0.02) { return Math.abs(a - b) < tol }
 function rms(f32) { let s = 0; for (let i = 0; i < f32.length; i++) s += f32[i] * f32[i]; return Math.sqrt(s / f32.length) }
+function matchesPcm(results, reference) {
+	let offset = 0
+	for (let result of results) for (let value of result.channelData[0] || [])
+		if (value !== reference[offset++]) return false
+	return offset === reference.length
+}
+function concatBytes(a, b) {
+	let output = new Uint8Array(a.length + b.length)
+	output.set(a); output.set(b, a.length)
+	return output
+}
 
 // whole-file decode
 console.log('FLAC whole-file')
@@ -43,9 +55,43 @@ console.log('FLAC reusable whole-file decoder')
 
 	let unknown = buf.slice()
 	unknown[21] &= 0xf0
-	unknown.fill(0, 22, 26)
-	let stream = await decoder(), head = stream.decode(unknown), tail = stream.flush()
-	ok((head.channelData[0]?.length || 0) + (tail.channelData[0]?.length || 0) === whole.channelData[0].length, 'unknown sample total falls back to streaming')
+	unknown.fill(0, 22, 42)
+	let unknownWhole = await decode(unknown)
+	ok(unknownWhole.channelData[0]?.length === whole.channelData[0].length, 'zero-total complete file returns all samples')
+	ok(unknownWhole.channelData[0].every((value, index) => value === whole.channelData[0][index]), 'zero-total complete file returns identical PCM')
+
+	let files = await decoder()
+	let firstUnknown = files.decode(unknown)
+	let splitHeader = files.decode(unknown.subarray(0, 1))
+	let secondUnknown = files.decode(unknown.subarray(1))
+	ok(firstUnknown.channelData[0]?.length === whole.channelData[0].length, 'zero-total file A decodes completely')
+	ok(!splitHeader.channelData.length && secondUnknown.channelData[0]?.length === whole.channelData[0].length, 'zero-total file A to A accepts a split header')
+	let different = files.decode(oggFlac)
+	ok(different.sampleRate === 48000 && different.channelData[0]?.length === 12000, 'zero-total raw file switches to Ogg FLAC')
+	let thirdUnknown = files.decode(unknown)
+	ok(thirdUnknown.sampleRate === 44100 && thirdUnknown.channelData[0]?.length === whole.channelData[0].length, 'Ogg FLAC switches back to zero-total raw FLAC')
+	files.free()
+
+	let frames = [...new CodecParser('audio/flac', { enableFrameCRC32: false }).parseAll(unknown)]
+	let audioOffset = unknown.length - frames.reduce((size, frame) => size + frame[data].length, 0)
+	let boundary = audioOffset + frames[0][data].length
+	let partialFrame = frames[0][data].subarray(0, frames[0][data].length >> 1)
+	files = await decoder()
+	let trailingPartial = files.decode(concatBytes(unknown, partialFrame))
+	let afterPartial = files.decode(unknown)
+	ok(matchesPcm([trailingPartial], whole.channelData[0]), 'zero-total file with a trailing partial frame returns exact PCM')
+	ok(matchesPcm([afterPartial], whole.channelData[0]), 'new file resets after a trailing partial frame')
+	files.free()
+
+	let stream = await decoder()
+	let results = [stream.decode(unknown.subarray(0, boundary)), stream.decode(unknown.subarray(boundary)), stream.flush()]
+	ok(results.filter(result => result.channelData.length).every(result => result.sampleRate === 44100 && result.channelData.length === 1), 'frame-boundary chunks return valid format')
+	ok(matchesPcm(results, whole.channelData[0]), 'frame-boundary chunks return exact PCM')
+	stream.free()
+
+	stream = await decoder()
+	results = [stream.decode(unknown.subarray(0, -1)), stream.decode(unknown.subarray(-1)), stream.flush()]
+	ok(matchesPcm(results, whole.channelData[0]), 'split final frame returns exact PCM on flush')
 	stream.free()
 }
 

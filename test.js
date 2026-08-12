@@ -89,6 +89,22 @@ t('reusable complete ogg flac', async () => {
 	dec.free()
 })
 
+t('reusable zero-total raw flac', async () => {
+	let input = new Uint8Array(flac).slice()
+	input[21] &= 0xf0
+	input.fill(0, 22, 42)
+	let reference = await decode(flac)
+	let dec = await flacDecoder()
+	for (let i = 0; i < 3; i++) {
+		let r = dec.decode(input)
+		is(r instanceof Promise, false, 'synchronous result')
+		is(r.channelData.length, 1)
+		is(r.channelData[0].length, reference.channelData[0].length)
+		is(r.sampleRate, 44100)
+	}
+	dec.free()
+})
+
 t('opus', async () => {
 	let r = await decode(opus)
 	is(r.sampleRate, 48000)

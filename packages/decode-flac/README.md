@@ -15,8 +15,8 @@ dec.free()
 ```
 
 `decoder()` initializes asynchronously. `decode()` and `flush()` are synchronous.
-`decode()` accepts consecutive complete Ogg files and raw FLAC files whose STREAMINFO
-block declares the sample total. For chunked input, `flush()` ends the decoder.
+`decode()` accepts consecutive raw FLAC and complete Ogg FLAC files. Raw FLAC may omit
+the STREAMINFO sample total. For chunked input, `flush()` ends the decoder.
 
 ## License
 
