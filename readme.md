@@ -42,28 +42,6 @@ let fromFile = await decode(fileInput.files[0])   // File
 let fromUrl  = await decode(await fetch(url))      // Response
 ```
 
-### Synchronous codecs
-
-The umbrella remains async for detection, lazy imports, and `Blob`/`Response` inputs.
-Import a codec package directly for synchronous calls.
-
-`wav`, `qoa`, `aiff`, and `caf` are synchronous:
-
-```js
-import decode from '@audio/decode-wav'
-let pcm = decode(wavBytes)
-```
-
-WASM codecs initialize asynchronously, then decode synchronously:
-
-```js
-import { decoder } from '@audio/decode-flac'
-let dec = await decoder()
-let pcm = dec.decode(bytes)
-let tail = dec.flush()
-dec.free()
-```
-
 ### Chunked
 
 ```js
@@ -99,6 +77,29 @@ Works from a CDN without a bundler. Codecs load on demand via dynamic import, on
 ```
 
 For self-hosting, use an import map to point `@audio/decode` and each needed `@audio/decode-*` package to local files. Codec-internal files load by relative path.
+
+
+### Synchronous codecs
+
+The umbrella remains async for detection, lazy imports, and `Blob`/`Response` inputs.
+Import a codec package directly for synchronous calls.
+
+`wav`, `qoa`, `aiff`, and `caf` are synchronous:
+
+```js
+import decode from '@audio/decode-wav'
+let pcm = decode(wavBytes)
+```
+
+WASM codecs initialize asynchronously, then decode synchronously:
+
+```js
+import { decoder } from '@audio/decode-flac'
+let dec = await decoder()
+let pcm = dec.decode(bytes)
+let tail = dec.flush()
+dec.free()
+```
 
 ### Metadata
 
