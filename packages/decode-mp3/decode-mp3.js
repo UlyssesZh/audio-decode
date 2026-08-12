@@ -1,4 +1,44 @@
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
+
+// ../_build/text-decoder.js
+var TextDecoder;
+var init_text_decoder = __esm({
+  "../_build/text-decoder.js"() {
+    TextDecoder = globalThis.TextDecoder ?? class {
+      decode(u8) {
+        let s = "", i = 0;
+        while (i < u8.length) {
+          let b = u8[i++], c = b;
+          if (b > 127) {
+            let n = b > 239 ? 3 : b > 223 ? 2 : 1;
+            for (c = b & 63 >> n; n--; ) c = c << 6 | u8[i++] & 63;
+          }
+          if (c > 65535) c -= 65536, s += String.fromCharCode(55296 | c >> 10, 56320 | c & 1023);
+          else s += String.fromCharCode(c);
+        }
+        return s;
+      }
+    };
+  }
+});
+
+// src/decode-mp3.src.js
+init_text_decoder();
+
+// ../../node_modules/mpg123-decoder/src/MPEGDecoder.js
+init_text_decoder();
+
+// ../../node_modules/@wasm-audio-decoders/common/index.js
+init_text_decoder();
+
+// ../../node_modules/@wasm-audio-decoders/common/src/WASMAudioDecoderCommon.js
+init_text_decoder();
+
 // ../../node_modules/simple-yenc/dist/esm.js
+init_text_decoder();
 var t = (t2, n = 4294967295, e2 = 79764919) => {
   const r = new Int32Array(256);
   let o, s, i, c = n;
@@ -204,102 +244,8 @@ function WASMAudioDecoderCommon() {
   };
 }
 
-// ../_build/empty-worker.js
-var empty_worker_default = null;
-
-// ../../node_modules/@wasm-audio-decoders/common/src/WASMAudioDecoderWorker.js
-var getWorker = () => globalThis.Worker || empty_worker_default;
-var WASMAudioDecoderWorker = class extends getWorker() {
-  constructor(options, name, Decoder, EmscriptenWASM2) {
-    if (!WASMAudioDecoderCommon.modules) new WASMAudioDecoderCommon();
-    let source = WASMAudioDecoderCommon.modules.get(Decoder);
-    if (!source) {
-      let type = "text/javascript", isNode, webworkerSourceCode = `'use strict';(${((_Decoder, _WASMAudioDecoderCommon, _EmscriptenWASM) => {
-        let decoder2, moduleResolve, modulePromise = new Promise((resolve) => {
-          moduleResolve = resolve;
-        });
-        self.onmessage = ({ data: { id, command, data } }) => {
-          let messagePromise = modulePromise, messagePayload = { id }, transferList;
-          if (command === "init") {
-            Object.defineProperties(_Decoder, {
-              WASMAudioDecoderCommon: { value: _WASMAudioDecoderCommon },
-              EmscriptenWASM: { value: _EmscriptenWASM },
-              module: { value: data.module },
-              isWebWorker: { value: true }
-            });
-            decoder2 = new _Decoder(data.options);
-            moduleResolve();
-          } else if (command === "free") {
-            decoder2.free();
-          } else if (command === "ready") {
-            messagePromise = messagePromise.then(() => decoder2.ready);
-          } else if (command === "reset") {
-            messagePromise = messagePromise.then(() => decoder2.reset());
-          } else {
-            Object.assign(
-              messagePayload,
-              decoder2[command](
-                // detach buffers
-                Array.isArray(data) ? data.map((data2) => new Uint8Array(data2)) : new Uint8Array(data)
-              )
-            );
-            transferList = messagePayload.channelData ? messagePayload.channelData.map((channel) => channel.buffer) : [];
-          }
-          messagePromise.then(
-            () => self.postMessage(messagePayload, transferList)
-          );
-        };
-      }).toString()})(${Decoder}, ${WASMAudioDecoderCommon}, ${EmscriptenWASM2})`;
-      try {
-        isNode = typeof process.versions.node !== "undefined";
-      } catch {
-      }
-      source = isNode ? `data:${type};base64,${Buffer.from(webworkerSourceCode).toString(
-        "base64"
-      )}` : URL.createObjectURL(new Blob([webworkerSourceCode], { type }));
-      WASMAudioDecoderCommon.modules.set(Decoder, source);
-    }
-    super(source, { name });
-    this._id = Number.MIN_SAFE_INTEGER;
-    this._enqueuedOperations = /* @__PURE__ */ new Map();
-    this.onmessage = ({ data }) => {
-      const { id, ...rest } = data;
-      this._enqueuedOperations.get(id)(rest);
-      this._enqueuedOperations.delete(id);
-    };
-    new EmscriptenWASM2(WASMAudioDecoderCommon).getModule().then((module) => {
-      this.postToDecoder("init", { module, options });
-    });
-  }
-  async postToDecoder(command, data) {
-    return new Promise((resolve) => {
-      this.postMessage({
-        command,
-        id: this._id,
-        data
-      });
-      this._enqueuedOperations.set(this._id++, resolve);
-    });
-  }
-  get ready() {
-    return this.postToDecoder("ready");
-  }
-  async free() {
-    await this.postToDecoder("free").finally(() => {
-      this.terminate();
-    });
-  }
-  async reset() {
-    await this.postToDecoder("reset");
-  }
-};
-
-// ../../node_modules/@wasm-audio-decoders/common/src/utilities.js
-var assignNames = (Class, name) => {
-  Object.defineProperty(Class, "name", { value: name });
-};
-
 // ../../node_modules/mpg123-decoder/src/EmscriptenWasm.js
+init_text_decoder();
 function EmscriptenWASM(WASMAudioDecoderCommon2) {
   var Module = Module;
   var out = (text) => console.log(text);
@@ -809,26 +755,6 @@ function MPEGDecoder(options = {}) {
   this._ready = this._init();
   return this;
 }
-
-// ../../node_modules/mpg123-decoder/src/MPEGDecoderWebWorker.js
-var MPEGDecoderWebWorker = class extends WASMAudioDecoderWorker {
-  constructor(options) {
-    super(options, "mpg123-decoder", MPEGDecoder, EmscriptenWASM);
-  }
-  async decode(data) {
-    return this.postToDecoder("decode", data);
-  }
-  async decodeFrame(data) {
-    return this.postToDecoder("decodeFrame", data);
-  }
-  async decodeFrames(data) {
-    return this.postToDecoder("decodeFrames", data);
-  }
-};
-
-// ../../node_modules/mpg123-decoder/index.js
-assignNames(MPEGDecoder, "MPEGDecoder");
-assignNames(MPEGDecoderWebWorker, "MPEGDecoderWebWorker");
 
 // src/decode-mp3.src.js
 var EMPTY = Object.freeze({ channelData: Object.freeze([]), sampleRate: 0 });

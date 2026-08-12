@@ -20,3 +20,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - if: matrix.node-version == '22.x'
+        run: npx playwright install --with-deps chromium
+      - if: matrix.node-version == '22.x'
+        run: npm run test:browser

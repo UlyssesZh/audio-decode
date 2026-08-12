@@ -2,7 +2,8 @@
  * MP3 decoder — mpg123 compiled to WASM
  * @module @audio/decode-mp3
  */
-import { MPEGDecoder } from 'mpg123-decoder'
+// build.sh maps the package to its non-worker default export.
+import MPEGDecoder from 'mpg123-decoder'
 
 const EMPTY = Object.freeze({ channelData: Object.freeze([]), sampleRate: 0 })
 

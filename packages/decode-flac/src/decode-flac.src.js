@@ -2,7 +2,8 @@
  * FLAC decoder backed by libFLAC WASM
  * @module @audio/decode-flac
  */
-import { FLACDecoder } from '@wasm-audio-decoders/flac'
+// build.sh maps the package to its non-worker default export.
+import FLACDecoder from '@wasm-audio-decoders/flac'
 import CodecParser, { data, totalSamples, samples, codecFrames, isLastPage } from 'codec-parser'
 
 const EMPTY = Object.freeze({ channelData: Object.freeze([]), sampleRate: 0 })

@@ -9,5 +9,4 @@ npx esbuild src/decode-webm.src.js \
   --outfile=decode-webm.js \
   --platform=node \
   --minify \
-  --external:./src/opus.wasm.js \
-  --alias:@eshaz/web-worker=../_build/empty-worker.js
+  --external:./src/opus.wasm.js

@@ -78,6 +78,7 @@ Works from a CDN without a bundler. Codecs load on demand via dynamic import, on
 
 For self-hosting, use an import map to point `@audio/decode` and each needed `@audio/decode-*` package to local files. Codec-internal files load by relative path.
 
+`@audio/decode-flac`, `@audio/decode-vorbis`, `@audio/decode-mp3`, and `@audio/decode-wav` decode inside an `AudioWorklet` without `Blob`, `TextDecoder`, `Worker`, or `fetch`.
 
 ### Synchronous codecs
 

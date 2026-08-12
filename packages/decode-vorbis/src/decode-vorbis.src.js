@@ -2,7 +2,8 @@
  * Ogg Vorbis decoder backed by libvorbis WASM
  * @module @audio/decode-vorbis
  */
-import { OggVorbisDecoder } from '@wasm-audio-decoders/ogg-vorbis'
+// build.sh maps the package to its non-worker default export.
+import OggVorbisDecoder from '@wasm-audio-decoders/ogg-vorbis'
 import CodecParser, { data, totalSamples, codecFrames, header, vorbisSetup, isLastPage } from 'codec-parser'
 
 const EMPTY = Object.freeze({ channelData: Object.freeze([]), sampleRate: 0 })

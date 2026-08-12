@@ -196,6 +196,79 @@ t('response input', async () => {
 	is(near(dur(r), 12.27), true)
 })
 
+const workletPCM = {
+	flacA: { channels: 1, samples: 12000, sampleRate: 48000, finite: true, active: true },
+	flacB: { channels: 1, samples: 541184, sampleRate: 44100, finite: true, active: true },
+	vorbisA: { channels: 2, samples: 13248, sampleRate: 44100, finite: true, active: true },
+	vorbisB: { channels: 1, samples: 541184, sampleRate: 44100, finite: true, active: true },
+	mp3: { channels: 2, samples: 541184, sampleRate: 44100, finite: true, active: true },
+	wav: { channels: 1, samples: 541184, sampleRate: 44100, finite: true, active: true },
+}
+const workletEmpty = { sync: true, channels: 0, samples: 0, sampleRate: 0, finite: true, active: false }
+
+// Chromium and Firefox AudioWorkletGlobalScope omit these browser globals.
+t('worklet-like scope', async () => {
+	if (!isNode) return skip('real worklet test covers browser')
+	let { execFileSync } = await import('node:child_process')
+	let script = `
+		const mp3 = (await import('audio-lena/mp3')).default
+		const fs = await import('node:fs')
+		const sample = 'aΩλ中\u{1D11E}'
+		const bytes = [...new TextEncoder().encode(sample)]
+		for (const g of ['TextDecoder', 'TextEncoder', 'Blob', 'Worker', 'atob', 'btoa', 'fetch', 'performance', 'setTimeout', 'URL']) delete globalThis[g]
+		const { TextDecoder } = await import('./packages/_build/text-decoder.js')
+		if (new TextDecoder().decode(new Uint8Array(bytes)) !== sample) throw Error('utf8 fallback mismatch')
+		const out = {}
+		for (const [name, path, fixture] of [
+			['flacA', './packages/decode-flac/decode-flac.js', './packages/decode-flac/fixtures/mono.oga'],
+			['vorbisA', './packages/decode-vorbis/decode-vorbis.js', './packages/decode-vorbis/fixtures/short.ogg'],
+			['mp3', './packages/decode-mp3/decode-mp3.js', null],
+		]) {
+			const decode = (await import(path)).default
+			const { channelData, sampleRate } = await decode(fixture ? new Uint8Array(fs.readFileSync(fixture)) : mp3)
+			out[name] = {
+				channels: channelData.length,
+				samples: channelData[0]?.length || 0,
+				sampleRate,
+				finite: channelData.every(ch => ch.every(Number.isFinite)),
+				active: channelData.some(ch => ch.some(sample => sample !== 0)),
+			}
+		}
+		console.log(JSON.stringify(out))
+	`
+	let report = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', script], { cwd: new URL('.', import.meta.url).pathname, encoding: 'utf8' }))
+	for (let name of ['flacA', 'vorbisA', 'mp3']) is(report[name], workletPCM[name], name)
+})
+
+t('worklet bundles omit worker runtime', async () => {
+	if (!isNode) return skip('generated bundle check runs in Node')
+	let workerRuntime = /WASMAudioDecoderWorker|DecoderWebWorker|new Blob|Buffer\.from|globalThis\.Worker|process\.versions/
+	for (let name of ['flac', 'vorbis', 'mp3', 'webm']) {
+		let source = String(await readFile(new URL(`./packages/decode-${name}/decode-${name}.js`, import.meta.url)))
+		is(workerRuntime.test(source), false, name)
+	}
+})
+
+t('audio worklet scope', async () => {
+	if (isNode || typeof OfflineAudioContext === 'undefined') return skip('browser only')
+	let fixtures = { flacA: shortOggFlac, flacB: flac, vorbisA: shortOgg, vorbisB: ogg, mp3, wav }
+	let ctx = new OfflineAudioContext(1, 128, 44100)
+	await ctx.audioWorklet.addModule('./test.worklet.js')
+	let node = new AudioWorkletNode(ctx, 'decode-test', { processorOptions: fixtures })
+	let report = await new Promise(resolve => {
+		let timer = setTimeout(() => resolve({ error: 'AudioWorklet timeout' }), 15000)
+		let done = value => { clearTimeout(timer); resolve(value) }
+		node.port.onmessage = event => done(event.data)
+		node.onprocessorerror = () => done({ error: 'AudioWorklet processor error' })
+	})
+	is(report.error, undefined, 'no error')
+	is(report.globals, Object.fromEntries(['Blob', 'TextDecoder', 'atob', 'Worker', 'URL', 'fetch', 'performance', 'setTimeout'].map(name => [name, 'undefined'])), 'restricted globals')
+	is(report.flac, [workletEmpty, workletEmpty, { sync: true, ...workletPCM.flacA }, { sync: true, ...workletPCM.flacA }, { sync: true, ...workletPCM.flacB }], 'FLAC null → empty → compact Ogg A → A → raw B')
+	is(report.vorbis, [workletEmpty, workletEmpty, { sync: true, ...workletPCM.vorbisA }, { sync: true, ...workletPCM.vorbisA }, { sync: true, ...workletPCM.vorbisB }], 'Vorbis null → empty → compact stereo A → A → full mono B')
+	is(report.mp3, [workletEmpty, workletEmpty, { sync: true, ...workletPCM.mp3 }], 'MP3 null → empty → full MPEG stream')
+	is(report.wav, { sync: true, ...workletPCM.wav }, 'full RIFF/WAVE file')
+})
+
 // -- streaming via decoders --
 
 t('stream mp3', async () => {

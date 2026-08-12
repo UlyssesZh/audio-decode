@@ -1,4 +1,44 @@
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
+
+// ../_build/text-decoder.js
+var TextDecoder;
+var init_text_decoder = __esm({
+  "../_build/text-decoder.js"() {
+    TextDecoder = globalThis.TextDecoder ?? class {
+      decode(u8) {
+        let s = "", i = 0;
+        while (i < u8.length) {
+          let b = u8[i++], c = b;
+          if (b > 127) {
+            let n = b > 239 ? 3 : b > 223 ? 2 : 1;
+            for (c = b & 63 >> n; n--; ) c = c << 6 | u8[i++] & 63;
+          }
+          if (c > 65535) c -= 65536, s += String.fromCharCode(55296 | c >> 10, 56320 | c & 1023);
+          else s += String.fromCharCode(c);
+        }
+        return s;
+      }
+    };
+  }
+});
+
+// src/decode-flac.src.js
+init_text_decoder();
+
+// ../../node_modules/@wasm-audio-decoders/flac/src/FLACDecoder.js
+init_text_decoder();
+
+// ../../node_modules/@wasm-audio-decoders/common/index.js
+init_text_decoder();
+
+// ../../node_modules/@wasm-audio-decoders/common/src/WASMAudioDecoderCommon.js
+init_text_decoder();
+
 // ../../node_modules/simple-yenc/dist/esm.js
+init_text_decoder();
 var t = (t2, n = 4294967295, e2 = 79764919) => {
   const r = new Int32Array(256);
   let o, s, i, c = n;
@@ -204,102 +244,17 @@ function WASMAudioDecoderCommon() {
   };
 }
 
-// ../_build/empty-worker.js
-var empty_worker_default = null;
+// ../../node_modules/codec-parser/index.js
+init_text_decoder();
 
-// ../../node_modules/@wasm-audio-decoders/common/src/WASMAudioDecoderWorker.js
-var getWorker = () => globalThis.Worker || empty_worker_default;
-var WASMAudioDecoderWorker = class extends getWorker() {
-  constructor(options, name, Decoder2, EmscriptenWASM2) {
-    if (!WASMAudioDecoderCommon.modules) new WASMAudioDecoderCommon();
-    let source = WASMAudioDecoderCommon.modules.get(Decoder2);
-    if (!source) {
-      let type = "text/javascript", isNode, webworkerSourceCode = `'use strict';(${((_Decoder, _WASMAudioDecoderCommon, _EmscriptenWASM) => {
-        let decoder2, moduleResolve, modulePromise = new Promise((resolve) => {
-          moduleResolve = resolve;
-        });
-        self.onmessage = ({ data: { id, command, data: data3 } }) => {
-          let messagePromise = modulePromise, messagePayload = { id }, transferList;
-          if (command === "init") {
-            Object.defineProperties(_Decoder, {
-              WASMAudioDecoderCommon: { value: _WASMAudioDecoderCommon },
-              EmscriptenWASM: { value: _EmscriptenWASM },
-              module: { value: data3.module },
-              isWebWorker: { value: true }
-            });
-            decoder2 = new _Decoder(data3.options);
-            moduleResolve();
-          } else if (command === "free") {
-            decoder2.free();
-          } else if (command === "ready") {
-            messagePromise = messagePromise.then(() => decoder2.ready);
-          } else if (command === "reset") {
-            messagePromise = messagePromise.then(() => decoder2.reset());
-          } else {
-            Object.assign(
-              messagePayload,
-              decoder2[command](
-                // detach buffers
-                Array.isArray(data3) ? data3.map((data4) => new Uint8Array(data4)) : new Uint8Array(data3)
-              )
-            );
-            transferList = messagePayload.channelData ? messagePayload.channelData.map((channel2) => channel2.buffer) : [];
-          }
-          messagePromise.then(
-            () => self.postMessage(messagePayload, transferList)
-          );
-        };
-      }).toString()})(${Decoder2}, ${WASMAudioDecoderCommon}, ${EmscriptenWASM2})`;
-      try {
-        isNode = typeof process.versions.node !== "undefined";
-      } catch {
-      }
-      source = isNode ? `data:${type};base64,${Buffer.from(webworkerSourceCode).toString(
-        "base64"
-      )}` : URL.createObjectURL(new Blob([webworkerSourceCode], { type }));
-      WASMAudioDecoderCommon.modules.set(Decoder2, source);
-    }
-    super(source, { name });
-    this._id = Number.MIN_SAFE_INTEGER;
-    this._enqueuedOperations = /* @__PURE__ */ new Map();
-    this.onmessage = ({ data: data3 }) => {
-      const { id, ...rest } = data3;
-      this._enqueuedOperations.get(id)(rest);
-      this._enqueuedOperations.delete(id);
-    };
-    new EmscriptenWASM2(WASMAudioDecoderCommon).getModule().then((module) => {
-      this.postToDecoder("init", { module, options });
-    });
-  }
-  async postToDecoder(command, data3) {
-    return new Promise((resolve) => {
-      this.postMessage({
-        command,
-        id: this._id,
-        data: data3
-      });
-      this._enqueuedOperations.set(this._id++, resolve);
-    });
-  }
-  get ready() {
-    return this.postToDecoder("ready");
-  }
-  async free() {
-    await this.postToDecoder("free").finally(() => {
-      this.terminate();
-    });
-  }
-  async reset() {
-    await this.postToDecoder("reset");
-  }
-};
+// ../../node_modules/codec-parser/src/CodecParser.js
+init_text_decoder();
 
-// ../../node_modules/@wasm-audio-decoders/common/src/utilities.js
-var assignNames = (Class, name) => {
-  Object.defineProperty(Class, "name", { value: name });
-};
+// ../../node_modules/codec-parser/src/utilities.js
+init_text_decoder();
 
 // ../../node_modules/codec-parser/src/constants.js
+init_text_decoder();
 var symbol = Symbol;
 var mappingJoin = ", ";
 var channelMappings = (() => {
@@ -593,6 +548,7 @@ var readInt64le = (view, offset) => {
 };
 
 // ../../node_modules/codec-parser/src/codecs/HeaderCache.js
+init_text_decoder();
 var HeaderCache = class {
   constructor(onCodecHeader, onCodecUpdate) {
     this._onCodecHeader = onCodecHeader;
@@ -657,7 +613,14 @@ var HeaderCache = class {
   }
 };
 
+// ../../node_modules/codec-parser/src/codecs/mpeg/MPEGParser.js
+init_text_decoder();
+
+// ../../node_modules/codec-parser/src/codecs/Parser.js
+init_text_decoder();
+
 // ../../node_modules/codec-parser/src/globals.js
+init_text_decoder();
 var headerStore = /* @__PURE__ */ new WeakMap();
 var frameStore = /* @__PURE__ */ new WeakMap();
 
@@ -707,7 +670,14 @@ var Parser = class {
   }
 };
 
+// ../../node_modules/codec-parser/src/codecs/mpeg/MPEGFrame.js
+init_text_decoder();
+
+// ../../node_modules/codec-parser/src/codecs/CodecFrame.js
+init_text_decoder();
+
 // ../../node_modules/codec-parser/src/containers/Frame.js
+init_text_decoder();
 var Frame = class {
   constructor(headerValue, dataValue) {
     frameStore.set(this, { [header]: headerValue });
@@ -748,7 +718,11 @@ var CodecFrame = class extends Frame {
   }
 };
 
+// ../../node_modules/codec-parser/src/codecs/mpeg/MPEGHeader.js
+init_text_decoder();
+
 // ../../node_modules/codec-parser/src/metadata/ID3v2.js
+init_text_decoder();
 var unsynchronizationFlag = "unsynchronizationFlag";
 var extendedHeaderFlag = "extendedHeaderFlag";
 var experimentalFlag = "experimentalFlag";
@@ -783,6 +757,7 @@ var ID3v2 = class _ID3v2 {
 };
 
 // ../../node_modules/codec-parser/src/codecs/CodecHeader.js
+init_text_decoder();
 var CodecHeader = class {
   /**
    * @private
@@ -1055,7 +1030,14 @@ var MPEGParser = class extends Parser {
   }
 };
 
+// ../../node_modules/codec-parser/src/codecs/aac/AACParser.js
+init_text_decoder();
+
+// ../../node_modules/codec-parser/src/codecs/aac/AACFrame.js
+init_text_decoder();
+
 // ../../node_modules/codec-parser/src/codecs/aac/AACHeader.js
+init_text_decoder();
 var mpegVersionValues = {
   0: "MPEG-4",
   8: "MPEG-2"
@@ -1232,7 +1214,11 @@ var AACParser = class extends Parser {
   }
 };
 
+// ../../node_modules/codec-parser/src/codecs/flac/FLACParser.js
+init_text_decoder();
+
 // ../../node_modules/codec-parser/src/codecs/flac/FLACFrame.js
+init_text_decoder();
 var FLACFrame = class _FLACFrame extends CodecFrame {
   static _getFrameFooterCrc16(data3) {
     return (data3[data3[length] - 2] << 8) + data3[data3[length] - 1];
@@ -1252,6 +1238,7 @@ var FLACFrame = class _FLACFrame extends CodecFrame {
 };
 
 // ../../node_modules/codec-parser/src/codecs/flac/FLACHeader.js
+init_text_decoder();
 var getFromStreamInfo = "get from STREAMINFO metadata block";
 var blockingStrategyValues = {
   0: "Fixed",
@@ -1576,7 +1563,14 @@ var FLACParser = class extends Parser {
   }
 };
 
+// ../../node_modules/codec-parser/src/containers/ogg/OggParser.js
+init_text_decoder();
+
+// ../../node_modules/codec-parser/src/containers/ogg/OggPage.js
+init_text_decoder();
+
 // ../../node_modules/codec-parser/src/containers/ogg/OggPageHeader.js
+init_text_decoder();
 var OggPageHeader = class _OggPageHeader {
   static *[getHeader](codecParser, headerCache, readOffset) {
     const header2 = {};
@@ -1670,7 +1664,11 @@ var OggPage = class _OggPage extends Frame {
   }
 };
 
+// ../../node_modules/codec-parser/src/codecs/opus/OpusParser.js
+init_text_decoder();
+
 // ../../node_modules/codec-parser/src/codecs/opus/OpusFrame.js
+init_text_decoder();
 var OpusFrame = class extends CodecFrame {
   constructor(data3, header2, samples3) {
     super(header2, data3, samples3);
@@ -1678,6 +1676,7 @@ var OpusFrame = class extends CodecFrame {
 };
 
 // ../../node_modules/codec-parser/src/codecs/opus/OpusHeader.js
+init_text_decoder();
 var channelMappingFamilies = {
   0: vorbisOpusChannelMapping.slice(0, 2),
   /*
@@ -1877,7 +1876,11 @@ var OpusParser = class extends Parser {
   }
 };
 
+// ../../node_modules/codec-parser/src/codecs/vorbis/VorbisParser.js
+init_text_decoder();
+
 // ../../node_modules/codec-parser/src/codecs/vorbis/VorbisFrame.js
+init_text_decoder();
 var VorbisFrame = class extends CodecFrame {
   constructor(data3, header2, samples3) {
     super(header2, data3, samples3);
@@ -1885,6 +1888,7 @@ var VorbisFrame = class extends CodecFrame {
 };
 
 // ../../node_modules/codec-parser/src/codecs/vorbis/VorbisHeader.js
+init_text_decoder();
 var blockSizes = {
   // 0b0110: 64,
   // 0b0111: 128,
@@ -2421,6 +2425,7 @@ var samples2 = samples;
 var totalSamples2 = totalSamples;
 
 // ../../node_modules/@wasm-audio-decoders/flac/src/EmscriptenWasm.js
+init_text_decoder();
 function EmscriptenWASM(WASMAudioDecoderCommon2) {
   var Module = Module;
   var out = (text) => console.log(text);
@@ -2930,32 +2935,6 @@ var FLACDecoder = class {
     return this[decodeFlac](flacFrames);
   }
 };
-
-// ../../node_modules/@wasm-audio-decoders/flac/src/FLACDecoderWebWorker.js
-var DecoderWorker = class extends WASMAudioDecoderWorker {
-  constructor(options) {
-    super(options, "flac-decoder", Decoder, EmscriptenWASM);
-  }
-  async decodeFrames(frames) {
-    return this.postToDecoder("decodeFrames", frames);
-  }
-};
-var FLACDecoderWebWorker = class extends FLACDecoder {
-  constructor() {
-    super();
-    super[setDecoderClass](DecoderWorker);
-  }
-  async free() {
-    await this._decoder.free();
-  }
-  terminate() {
-    this._decoder.terminate();
-  }
-};
-
-// ../../node_modules/@wasm-audio-decoders/flac/index.js
-assignNames(FLACDecoder, "FLACDecoder");
-assignNames(FLACDecoderWebWorker, "FLACDecoderWebWorker");
 
 // src/decode-flac.src.js
 var EMPTY = Object.freeze({ channelData: Object.freeze([]), sampleRate: 0 });
