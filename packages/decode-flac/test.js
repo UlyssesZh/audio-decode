@@ -141,5 +141,21 @@ console.log('Ogg FLAC streaming')
 	ok(total === whole.channelData[0].length, 'chunked length matches whole-file')
 }
 
+// Trailing digital silence: the reference encoder (flac 1.4, --blocksize=4096) writes it as tiny
+// CONSTANT-subframe frames. A frame CRC-16 starting from 0 also checks out over frames laid end to
+// end, so splitting at the end of the data must still find each header: every sample comes back.
+console.log('FLAC trailing silence (tiny frames at the end)')
+{
+	let tail = readFileSync(new URL('./fixtures/silent-tail.flac', import.meta.url))
+	let whole = await decode(tail)
+	ok(whole.channelData[0].length === 18960, 'whole: 2.37 s at 8 kHz, every sample: ' + whole.channelData[0].length)
+	ok(whole.channelData[0].subarray(8000).every(v => v === 0), 'the tail is silence')
+	let dec = await decoder(), n = 0
+	for (let i = 0; i < tail.length; i += 777) n += dec.decode(tail.subarray(i, i + 777)).channelData[0]?.length || 0
+	n += dec.flush().channelData[0]?.length || 0
+	dec.free()
+	ok(n === 18960, 'chunked (777 bytes): every sample: ' + n)
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail) process.exit(1)

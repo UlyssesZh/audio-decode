@@ -729,11 +729,11 @@ var experimentalFlag = "experimentalFlag";
 var footerPresent = "footerPresent";
 var ID3v2 = class _ID3v2 {
   static *getID3v2Header(codecParser, headerCache, readOffset) {
-    const headerLength = 10;
+    const headerLength2 = 10;
     const header2 = {};
     let data3 = yield* codecParser[readRawData](3, readOffset);
     if (data3[0] !== 73 || data3[1] !== 68 || data3[2] !== 51) return null;
-    data3 = yield* codecParser[readRawData](headerLength, readOffset);
+    data3 = yield* codecParser[readRawData](headerLength2, readOffset);
     header2[version] = `id3v2.${data3[3]}.${data3[4]}`;
     if (data3[5] & 15) return null;
     header2[unsynchronizationFlag] = !!(data3[5] & 128);
@@ -743,7 +743,7 @@ var ID3v2 = class _ID3v2 {
     if (data3[6] & 128 || data3[7] & 128 || data3[8] & 128 || data3[9] & 128)
       return null;
     const dataLength = data3[6] << 21 | data3[7] << 14 | data3[8] << 7 | data3[9];
-    header2[length] = headerLength + dataLength;
+    header2[length] = headerLength2 + dataLength;
     return new _ID3v2(header2);
   }
   constructor(header2) {
@@ -974,7 +974,7 @@ var MPEGHeader = class _MPEGHeader extends CodecHeader {
     if (header2[emphasis] === reserved) return null;
     header2[bitDepth] = 16;
     {
-      const { length: length2, frameLength: frameLength2, samples: samples3, ...codecUpdateFields } = header2;
+      const { length: length2, frameLength: frameLength2, samples: samples2, ...codecUpdateFields } = header2;
       headerCache[setHeader](key, header2, codecUpdateFields);
     }
     return new _MPEGHeader(header2);
@@ -1009,8 +1009,8 @@ var MPEGFrame = class _MPEGFrame extends CodecFrame {
       readOffset
     );
   }
-  constructor(header2, frame2, samples3) {
-    super(header2, frame2, samples3);
+  constructor(header2, frame2, samples2) {
+    super(header2, frame2, samples2);
   }
 };
 
@@ -1139,7 +1139,7 @@ var AACHeader = class _AACHeader extends CodecHeader {
           profileBits: profileBits2,
           sampleRateBits: sampleRateBits2,
           frameLength: frameLength2,
-          samples: samples3,
+          samples: samples2,
           numberAACFrames: numberAACFrames2,
           ...codecUpdateFields
         } = header2;
@@ -1193,8 +1193,8 @@ var AACFrame = class _AACFrame extends CodecFrame {
       readOffset
     );
   }
-  constructor(header2, frame2, samples3) {
-    super(header2, frame2, samples3);
+  constructor(header2, frame2, samples2) {
+    super(header2, frame2, samples2);
   }
 };
 
@@ -1443,7 +1443,7 @@ var FLACHeader = class _FLACHeader extends CodecHeader {
           blockingStrategyBits: blockingStrategyBits2,
           frameNumber: frameNumber2,
           sampleNumber: sampleNumber2,
-          samples: samples3,
+          samples: samples2,
           sampleRateBits: sampleRateBits2,
           blockSizeBits: blockSizeBits2,
           crc: crc2,
@@ -1638,10 +1638,10 @@ var OggPage = class _OggPage extends Frame {
     );
     if (header2) {
       const frameLengthValue = headerStore.get(header2)[frameLength];
-      const headerLength = headerStore.get(header2)[length];
-      const totalLength = headerLength + frameLengthValue;
+      const headerLength2 = headerStore.get(header2)[length];
+      const totalLength = headerLength2 + frameLengthValue;
       const rawDataValue = (yield* codecParser[readRawData](totalLength, 0))[subarray](0, totalLength);
-      const frame2 = rawDataValue[subarray](headerLength, totalLength);
+      const frame2 = rawDataValue[subarray](headerLength2, totalLength);
       return new _OggPage(header2, frame2, rawDataValue);
     } else {
       return null;
@@ -1670,8 +1670,8 @@ init_text_decoder();
 // ../../node_modules/codec-parser/src/codecs/opus/OpusFrame.js
 init_text_decoder();
 var OpusFrame = class extends CodecFrame {
-  constructor(data3, header2, samples3) {
-    super(header2, data3, samples3);
+  constructor(data3, header2, samples2) {
+    super(header2, data3, samples2);
   }
 };
 
@@ -1859,12 +1859,12 @@ var OpusParser = class extends Parser {
         if (header2) {
           if (this._preSkipRemaining === null)
             this._preSkipRemaining = header2[preSkip];
-          let samples3 = header2[frameSize] * header2[frameCount] / 1e3 * header2[sampleRate];
+          let samples2 = header2[frameSize] * header2[frameCount] / 1e3 * header2[sampleRate];
           if (this._preSkipRemaining > 0) {
-            this._preSkipRemaining -= samples3;
-            samples3 = this._preSkipRemaining < 0 ? -this._preSkipRemaining : 0;
+            this._preSkipRemaining -= samples2;
+            samples2 = this._preSkipRemaining < 0 ? -this._preSkipRemaining : 0;
           }
-          return new OpusFrame(segment, header2, samples3);
+          return new OpusFrame(segment, header2, samples2);
         }
         this._codecParser[logError2](
           "Failed to parse Ogg Opus Header",
@@ -1882,8 +1882,8 @@ init_text_decoder();
 // ../../node_modules/codec-parser/src/codecs/vorbis/VorbisFrame.js
 init_text_decoder();
 var VorbisFrame = class extends CodecFrame {
-  constructor(data3, header2, samples3) {
-    super(header2, data3, samples3);
+  constructor(data3, header2, samples2) {
+    super(header2, data3, samples2);
   }
 };
 
@@ -2421,7 +2421,6 @@ var codec_parser_default = CodecParser;
 var codecFrames2 = codecFrames;
 var data2 = data;
 var isLastPage2 = isLastPage;
-var samples2 = samples;
 var totalSamples2 = totalSamples;
 
 // ../../node_modules/@wasm-audio-decoders/flac/src/EmscriptenWasm.js
@@ -3090,12 +3089,106 @@ async function decoder() {
   return upstream;
 }
 function createParser(ogg) {
-  return new codec_parser_default(ogg ? "audio/ogg" : "audio/flac", {
+  if (!ogg) return rawParser();
+  return new codec_parser_default("audio/ogg", {
     onCodec: (codec2) => {
       if (codec2 !== "flac") throw Error("@audio/decode-flac does not support this codec " + codec2);
     },
     enableFrameCRC32: false
   });
+}
+function rawParser() {
+  let buf = new Uint8Array(0), meta = true, start = -1, scan = 0, crc2 = 0;
+  function* frames(end) {
+    if (meta) {
+      if (buf.length < 4) return;
+      let o = 0;
+      if (buf[0] === 102 && buf[1] === 76 && buf[2] === 97 && buf[3] === 67) {
+        o = 4;
+        for (; ; ) {
+          if (o + 4 > buf.length) return;
+          let last = buf[o] & 128, len = buf[o + 1] << 16 | buf[o + 2] << 8 | buf[o + 3];
+          o += 4 + len;
+          if (o > buf.length) return;
+          if (last) break;
+        }
+      }
+      meta = false;
+      buf = buf.subarray(o);
+    }
+    if (start < 0) {
+      let p = 0;
+      while (p + 1 < buf.length && headerLength(buf, p) < 0) p++;
+      if (headerLength(buf, p) < 0) {
+        buf = buf.subarray(p);
+        return;
+      }
+      start = p;
+      scan = p;
+      crc2 = 0;
+    }
+    for (; ; ) {
+      let next = -1;
+      for (; scan < buf.length; scan++) {
+        if (scan > start + 3 && crc2 === 0 && buf[scan] === 255 && (buf[scan + 1] & 254) === 248 && headerLength(buf, scan) > 0) {
+          next = scan;
+          break;
+        }
+        crc2 = CRC16[crc2 >> 8 ^ buf[scan]] ^ crc2 << 8 & 65535;
+      }
+      if (next < 0) {
+        if (end && start < buf.length && crc2 === 0) {
+          yield buf.subarray(start);
+          start = scan = buf.length;
+        }
+        break;
+      }
+      yield buf.subarray(start, next);
+      start = next;
+      crc2 = 0;
+      scan = next;
+    }
+    buf = buf.subarray(start);
+    scan -= start;
+    start = 0;
+  }
+  return {
+    parseChunk(chunk) {
+      buf = buf.length ? concatBytes(buf, chunk) : chunk;
+      return [...frames(false)];
+    },
+    parseAll(all) {
+      buf = all;
+      return [...frames(true)];
+    },
+    flush() {
+      return [...frames(true)];
+    }
+  };
+}
+var CRC16 = Uint16Array.from({ length: 256 }, (_, i) => {
+  let c = i << 8;
+  for (let k = 0; k < 8; k++) c = c & 32768 ? c << 1 ^ 32773 : c << 1;
+  return c & 65535;
+});
+function headerLength(b, p) {
+  if (p + 5 > b.length || b[p] !== 255 || (b[p + 1] & 254) !== 248) return -1;
+  let bs = b[p + 2] >> 4, sr = b[p + 2] & 15;
+  if (!bs || sr === 15 || b[p + 3] >> 4 > 10 || b[p + 3] & 1) return -1;
+  let q = p + 4, c = b[q], n = c < 128 ? 0 : c < 224 ? 1 : c < 240 ? 2 : c < 248 ? 3 : c < 252 ? 4 : c < 254 ? 5 : 6;
+  q += 1 + n + (bs === 6 ? 1 : bs === 7 ? 2 : 0) + (sr === 12 ? 1 : sr === 13 || sr === 14 ? 2 : 0);
+  if (q >= b.length) return -1;
+  let crc2 = 0;
+  for (let i = p; i < q; i++) {
+    crc2 ^= b[i];
+    for (let k = 0; k < 8; k++) crc2 = crc2 & 128 ? (crc2 << 1 ^ 7) & 255 : crc2 << 1 & 255;
+  }
+  return crc2 === b[q] ? q - p + 1 : -1;
+}
+function frameSamples(b) {
+  let bs = b[2] >> 4, c = b[4], n = c < 128 ? 0 : c < 224 ? 1 : c < 240 ? 2 : c < 248 ? 3 : c < 252 ? 4 : c < 254 ? 5 : 6;
+  let q = 5 + n;
+  return bs === 1 ? 192 : bs <= 5 ? 576 << bs - 2 : bs === 6 ? b[q] + 1 : bs === 7 ? (b[q] << 8 | b[q + 1]) + 1 : 256 << bs - 8;
 }
 function parseInitialFlac(buf) {
   let info = flacInfo(buf);
@@ -3103,7 +3196,7 @@ function parseInitialFlac(buf) {
   try {
     let frames = [...createParser(false).parseAll(buf)];
     if (!frames.length) return null;
-    let parsed = frames.reduce((total2, frame2) => total2 + (frame2[samples2] || 0), 0);
+    let parsed = frames.reduce((total2, frame2) => total2 + frameSamples(frame2), 0);
     return !info.total || parsed === info.total ? { frames, total: info.total } : null;
   } catch {
     return null;

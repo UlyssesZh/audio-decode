@@ -4,7 +4,7 @@
  */
 // build.sh maps the package to its non-worker default export.
 import FLACDecoder from '@wasm-audio-decoders/flac'
-import CodecParser, { data, totalSamples, samples, codecFrames, isLastPage } from 'codec-parser'
+import CodecParser, { data, totalSamples, codecFrames, isLastPage } from 'codec-parser'
 
 const EMPTY = Object.freeze({ channelData: Object.freeze([]), sampleRate: 0 })
 
@@ -147,10 +147,91 @@ export async function decoder() {
 }
 
 function createParser(ogg) {
-	return new CodecParser(ogg ? 'audio/ogg' : 'audio/flac', {
+	if (!ogg) return rawParser()
+	return new CodecParser('audio/ogg', {
 		onCodec: codec => { if (codec !== 'flac') throw Error('@audio/decode-flac does not support this codec ' + codec) },
 		enableFrameCRC32: false
 	})
+}
+
+/**
+ * Native FLAC frames (RFC 9639 §9), split here rather than by codec-parser: at the end of its data
+ * that parser takes the rest as one frame, and since a CRC-16 that starts from 0 also checks out
+ * over valid frames laid end to end, trailing tiny frames (digital silence) merged and all but the
+ * first were lost. A frame ends at the nearest CRC-8-verified header before which its bytes pass
+ * CRC-16. Same interface as the codec-parser calls here: parseChunk / parseAll / flush → frames.
+ */
+function rawParser() {
+	let buf = new Uint8Array(0), meta = true, start = -1, scan = 0, crc = 0
+	function* frames(end) {
+		if (meta) {
+			if (buf.length < 4) return
+			let o = 0
+			if (buf[0] === 0x66 && buf[1] === 0x4c && buf[2] === 0x61 && buf[3] === 0x43) {
+				o = 4
+				for (;;) {  // metadata blocks up to the one flagged last
+					if (o + 4 > buf.length) return
+					let last = buf[o] & 0x80, len = buf[o + 1] << 16 | buf[o + 2] << 8 | buf[o + 3]
+					o += 4 + len
+					if (o > buf.length) return
+					if (last) break
+				}
+			}
+			meta = false; buf = buf.subarray(o)
+		}
+		if (start < 0) {  // sync to the first header
+			let p = 0
+			while (p + 1 < buf.length && headerLength(buf, p) < 0) p++
+			if (headerLength(buf, p) < 0) { buf = buf.subarray(p); return }
+			start = p; scan = p; crc = 0
+		}
+		for (;;) {
+			let next = -1
+			for (; scan < buf.length; scan++) {
+				if (scan > start + 3 && crc === 0 && buf[scan] === 0xff && (buf[scan + 1] & 0xfe) === 0xf8 && headerLength(buf, scan) > 0) { next = scan; break }
+				crc = CRC16[(crc >> 8) ^ buf[scan]] ^ (crc << 8) & 0xffff
+			}
+			if (next < 0) {
+				if (end && start < buf.length && crc === 0) { yield buf.subarray(start); start = scan = buf.length }
+				break
+			}
+			yield buf.subarray(start, next)
+			start = next; crc = 0; scan = next
+		}
+		buf = buf.subarray(start); scan -= start; start = 0
+	}
+	return {
+		parseChunk(chunk) { buf = buf.length ? concatBytes(buf, chunk) : chunk; return [...frames(false)] },
+		parseAll(all) { buf = all; return [...frames(true)] },
+		flush() { return [...frames(true)] },
+	}
+}
+
+// CRC-16, polynomial 0x8005, initial 0 (RFC 9639 §9.3)
+const CRC16 = Uint16Array.from({ length: 256 }, (_, i) => {
+	let c = i << 8
+	for (let k = 0; k < 8; k++) c = c & 0x8000 ? (c << 1) ^ 0x8005 : c << 1
+	return c & 0xffff
+})
+
+/** A frame header at p verified by its CRC-8 (RFC 9639 §9.1): its length in bytes, or -1. */
+function headerLength(b, p) {
+	if (p + 5 > b.length || b[p] !== 0xff || (b[p + 1] & 0xfe) !== 0xf8) return -1
+	let bs = b[p + 2] >> 4, sr = b[p + 2] & 15
+	if (!bs || sr === 15 || (b[p + 3] >> 4) > 10 || (b[p + 3] & 1)) return -1
+	let q = p + 4, c = b[q], n = c < 0x80 ? 0 : c < 0xe0 ? 1 : c < 0xf0 ? 2 : c < 0xf8 ? 3 : c < 0xfc ? 4 : c < 0xfe ? 5 : 6
+	q += 1 + n + (bs === 6 ? 1 : bs === 7 ? 2 : 0) + (sr === 12 ? 1 : sr === 13 || sr === 14 ? 2 : 0)
+	if (q >= b.length) return -1
+	let crc = 0
+	for (let i = p; i < q; i++) { crc ^= b[i]; for (let k = 0; k < 8; k++) crc = crc & 0x80 ? ((crc << 1) ^ 7) & 0xff : (crc << 1) & 0xff }
+	return crc === b[q] ? q - p + 1 : -1
+}
+
+/** Samples in a frame, from its header's block size (RFC 9639 §9.1.1). */
+function frameSamples(b) {
+	let bs = b[2] >> 4, c = b[4], n = c < 0x80 ? 0 : c < 0xe0 ? 1 : c < 0xf0 ? 2 : c < 0xf8 ? 3 : c < 0xfc ? 4 : c < 0xfe ? 5 : 6
+	let q = 5 + n
+	return bs === 1 ? 192 : bs <= 5 ? 576 << (bs - 2) : bs === 6 ? b[q] + 1 : bs === 7 ? (b[q] << 8 | b[q + 1]) + 1 : 256 << (bs - 8)
 }
 
 function parseInitialFlac(buf) {
@@ -159,7 +240,7 @@ function parseInitialFlac(buf) {
 	try {
 		let frames = [...createParser(false).parseAll(buf)]
 		if (!frames.length) return null
-		let parsed = frames.reduce((total, frame) => total + (frame[samples] || 0), 0)
+		let parsed = frames.reduce((total, frame) => total + frameSamples(frame), 0)
 		return !info.total || parsed === info.total ? { frames, total: info.total } : null
 	} catch { return null }
 }
