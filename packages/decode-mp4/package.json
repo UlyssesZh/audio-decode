@@ -1,6 +1,6 @@
 {
   "name": "@audio/decode-mp4",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Decode the audio track of MP4, MOV, M4A, M4V and 3GP files (AAC, ALAC, MP3, FLAC, Opus, AMR, PCM) to PCM samples",
   "type": "module",
   "main": "decode-mp4.js",

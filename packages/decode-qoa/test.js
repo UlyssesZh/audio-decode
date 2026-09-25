@@ -30,6 +30,18 @@ console.log('QOA decoder')
 	dec.free()
 }
 
+// streaming mode (qoa.h: file header samples = 0, frames until the end) and chunked decode
+console.log('QOA streaming mode, chunked')
+{
+	let whole = decode(qoa)
+	let live = new Uint8Array(qoa); live[4] = live[5] = live[6] = live[7] = 0
+	let r = decode(live)
+	ok(r.channelData[0].length === whole.channelData[0].length && r.channelData[0].every((v, i) => v === whole.channelData[0][i]), 'samples: 0 decodes every frame, same samples')
+	let dec = decoder(), n = 0
+	for (let i = 0; i < qoa.length; i += 777) n += dec.decode(qoa.subarray(i, i + 777)).channelData[0]?.length || 0
+	ok(n === whole.channelData[0].length, 'chunked (777 bytes) yields every sample: ' + n)
+}
+
 // sync API
 console.log('QOA sync')
 {

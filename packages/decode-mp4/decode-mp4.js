@@ -41,6 +41,7 @@ class MP4Decoder {
 		this.pending = null   // codec load in flight
 		this.codec = null     // { feed(frames), flush(), free() }
 		this.st = null        // sample-table walker: { sizes, stco, stsc, idx, ci, sInC, spc, nextOff }
+		this.fr = null        // fragment walker (fragmented file): { id, trex, pos, queue, qi }
 		this.left = null      // unconsumed bytes
 		this.fileOff = 0      // absolute file offset of left[0]
 		this.skip = 0         // bytes to discard before the next sample
@@ -52,7 +53,7 @@ class MP4Decoder {
 		if (!data || !data.byteLength) return EMPTY
 		let buf = data instanceof Uint8Array ? data : new Uint8Array(data)
 		if (this.pending) return this.pending.then(() => this.decode(buf))
-		if (this.st) return this.feed(buf)
+		if (this.st || this.fr) return this.feed(buf)
 
 		this.accum.push(buf); this.accumLen += buf.length
 		let all = this.accum.length === 1 ? this.accum[0] : concat(this.accum, this.accumLen)
@@ -64,8 +65,10 @@ class MP4Decoder {
 			if (this.freed) { codec.free(); return EMPTY }
 			this.codec = codec
 			let { sizes, stco, stsc } = track
-			this.st = { sizes, stco, stsc, idx: 0, ci: 0, sInC: 0, spc: spcAt(0, stsc), nextOff: stco[0] }
 			this.left = all; this.fileOff = 0; this.skip = 0
+			// fragmented (ISO/IEC 14496-12 §8.8): samples come in moof+mdat pairs after the moov
+			if (track.fragmented) { this.fr = { id: track.id, trex: track.trex, pos: 0, queue: [], qi: 0 }; return this.fragments() }
+			this.st = { sizes, stco, stsc, idx: 0, ci: 0, sInC: 0, spc: spcAt(0, stsc), nextOff: stco[0] }
 			return this.extract()
 		})
 	}
@@ -78,7 +81,37 @@ class MP4Decoder {
 			if (!buf.length) return EMPTY
 		}
 		this.left = append(this.left, buf)
-		return this.extract()
+		return this.fr ? this.fragments() : this.extract()
+	}
+
+	// Top-level boxes in order: each complete moof queues its samples (absolute offsets), which are
+	// read out of the following mdat as its bytes arrive; bytes nobody needs any more are dropped.
+	fragments() {
+		let fr = this.fr, frames = []
+		for (;;) {
+			let q = fr.queue
+			for (; fr.qi < q.length; fr.qi++) {
+				let [off, sz] = q[fr.qi], b = off - this.fileOff
+				if (!this.left || b + sz > this.left.length) break
+				frames.push(this.left.subarray(b, b + sz))
+			}
+			if (fr.qi === q.length) { q.length = 0; fr.qi = 0 }
+			let b = fr.pos - this.fileOff, left = this.left
+			if (fr.pos === Infinity || !left || b < 0 || b + 8 > left.length) break
+			let size = r32(left, b), type = str4(left, b + 4)
+			if (size === 1) { if (b + 16 > left.length) break; size = r32(left, b + 8) * 0x100000000 + r32(left, b + 12) }
+			else if (size === 0) size = Infinity  // to the end of the file
+			if (type === 'moof') {
+				if (b + size > left.length) break  // wait for the whole moof
+				moofSamples(left, b, size, fr.pos, fr)
+			}
+			fr.pos += size
+		}
+		// keep bytes from the next queued sample or the next box, whichever comes first
+		let keep = Math.min(fr.pos, fr.qi < fr.queue.length ? fr.queue[fr.qi][0] : Infinity), end = this.fileOff + (this.left?.length || 0)
+		if (keep >= end && keep !== Infinity) { this.skip = keep - end; this.fileOff = end; this.left = null }
+		else if (keep > this.fileOff && keep !== Infinity) { this.left = this.left.subarray(keep - this.fileOff).slice(); this.fileOff = keep }
+		return frames.length ? this.codec.feed(frames) : EMPTY
 	}
 
 	// Walk sample tables by absolute file offset so chunk boundaries are irrelevant.
@@ -104,7 +137,6 @@ class MP4Decoder {
 		if (this.pending) return this.pending.then(() => this.flush())
 		this.freed = true
 		if (!this.codec) {
-			if (this.accumLen && findBox(concat(this.accum, this.accumLen), 'moof')) throw Error('Fragmented MP4 is not supported')
 			throw Error(this.accumLen ? 'No audio track found in MP4' : 'Not an MP4 file')
 		}
 		try { return this.codec.flush() } finally { this.codec.free(); this.codec = null; this.left = null }
@@ -114,14 +146,14 @@ class MP4Decoder {
 		if (this.freed) return
 		this.freed = true
 		this.codec?.free(); this.codec = null
-		this.accum = []; this.left = null; this.st = null
+		this.accum = []; this.left = null; this.st = null; this.fr = null
 	}
 }
 
 
 // ===== ISO BMFF demuxer =====
 
-const CONTAINERS = new Set(['moov', 'trak', 'mdia', 'minf', 'stbl', 'udta', 'edts', 'sinf', 'wave'])
+const CONTAINERS = new Set(['moov', 'trak', 'mdia', 'minf', 'stbl', 'udta', 'edts', 'sinf', 'wave', 'mvex', 'traf'])
 
 /** Walk boxes in [start, end), calling cb(type, body, bodyOff) for leaves and cb(type, null) at container boundaries. */
 function walk(buf, start, end, cb) {
@@ -144,10 +176,37 @@ function walk(buf, start, end, cb) {
 	return true
 }
 
-function findBox(buf, name) {
-	let found = false
-	walk(buf, 0, buf.length, type => { if (type === name) found = true })
-	return found
+/** Queue the samples a moof's track fragments place (ISO/IEC 14496-12 §8.8.7 tfhd, §8.8.8 trun):
+ *  absolute [offset, size] pairs, sizes from trun, else tfhd's default, else trex's. */
+function moofSamples(buf, start, size, abs, fr) {
+	let traf = null
+	walk(buf, start + 8, start + size, (type, d) => {
+		if (type === 'traf') traf = { base: abs, size: fr.trex.size || 0, mine: false, next: null }
+		else if (type === 'tfhd') {
+			let flags = (d[1] << 16) | (d[2] << 8) | d[3], p = 8
+			traf.mine = r32(d, 4) === fr.id
+			if (flags & 1) { traf.base = r32(d, p) * 0x100000000 + r32(d, p + 4); p += 8 }  // else: default-base-is-moof, or the first traf
+			if (flags & 2) p += 4
+			if (flags & 8) p += 4
+			if (flags & 0x10) traf.size = r32(d, p)
+		}
+		else if (type === 'trun' && traf?.mine) {
+			let flags = (d[1] << 16) | (d[2] << 8) | d[3], n = r32(d, 4), p = 8
+			let off = traf.next ?? traf.base
+			if (flags & 1) { off = traf.base + (r32(d, p) | 0); p += 4 }
+			if (flags & 4) p += 4
+			for (let i = 0; i < n; i++) {
+				if (flags & 0x100) p += 4
+				let sz = traf.size
+				if (flags & 0x200) { sz = r32(d, p); p += 4 }
+				if (flags & 0x400) p += 4
+				if (flags & 0x800) p += 4
+				fr.queue.push([off, sz])
+				off += sz
+			}
+			traf.next = off
+		}
+	})
 }
 
 // QuickTime sound sample description: v0 = 36-byte header, v1 adds 16 bytes, v2 declares its own size.
@@ -179,11 +238,14 @@ function parseStsd(buf, off, end, cb) {
 
 /** Parse the first audio track out of a complete moov. Returns null while moov is incomplete or absent. */
 function parseTrack(buf) {
-	let traks = [], t = null, moov = false
+	let traks = [], t = null, moov = false, trex = new Map()
 	walk(buf, 0, buf.length, (type, data, off) => {
 		if (type === 'moov') moov = true
 		else if (type === 'trak') traks.push(t = { children: {} })
+		else if (type === '/trak') t = null
+		else if (type === 'trex') trex.set(r32(data, 4), { size: r32(data, 16) })
 		else if (!t) return
+		else if (type === 'tkhd') t.id = r32(data, data[0] === 1 ? 20 : 12)
 		else if (type === 'hdlr') t.handler = str4(data, 8)
 		else if (type === 'mdhd') t.timescale = r32(data, data[0] === 1 ? 20 : 12)
 		else if (type === 'entry') t.entry ??= data
@@ -196,7 +258,9 @@ function parseTrack(buf) {
 	if (!moov) return null
 	let track = traks.find(t => t.handler === 'soun' && t.entry) ?? traks.find(t => t.entry && AUDIO_TYPES.has(t.entry.type))
 	if (!track) throw Error('No audio track found in MP4')
-	if (!track.sizes || !track.stco?.length) throw Error('Audio track has no sample tables')
+	// movie fragments carry the samples when mvex is there and the tables are empty
+	if (trex.size && !track.sizes?.length) { track.fragmented = true; track.trex = trex.get(track.id) || {} }
+	else if (!track.sizes || !track.stco?.length) throw Error('Audio track has no sample tables')
 	if (!track.entry.sampleRate && track.timescale) track.entry.sampleRate = track.timescale
 	return track
 }

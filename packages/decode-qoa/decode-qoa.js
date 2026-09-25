@@ -1,139 +1,4 @@
-// ../../node_modules/@thi.ng/errors/deferror.js
-var defError = (prefix, suffix = (msg) => msg !== void 0 ? ": " + msg : "") => class extends Error {
-  origMessage;
-  constructor(msg) {
-    super(prefix(msg) + suffix(msg));
-    this.origMessage = msg !== void 0 ? String(msg) : "";
-  }
-};
-
-// ../../node_modules/@thi.ng/errors/illegal-arguments.js
-var IllegalArgumentError = defError(() => "illegal argument(s)");
-var illegalArgs = (msg) => {
-  throw new IllegalArgumentError(msg);
-};
-
-// ../../node_modules/@thi.ng/errors/illegal-state.js
-var IllegalStateError = defError(() => "illegal state");
-var illegalState = (msg) => {
-  throw new IllegalStateError(msg);
-};
-
-// ../../node_modules/@thi.ng/bitstream/input.js
-var U32 = 4294967296;
-var BitInputStream = class {
-  buffer;
-  start;
-  limit;
-  pos;
-  bitPos;
-  bit;
-  constructor(buffer, offset = 0, limit = buffer.length << 3) {
-    this.buffer = buffer;
-    this.start = offset;
-    this.limit = limit;
-    this.seek(offset);
-  }
-  *[Symbol.iterator]() {
-    let j = this.start;
-    let i = j >>> 3;
-    let b = 7 - (j & 7);
-    while (j < this.limit) {
-      yield this.buffer[i] >>> b & 1;
-      if (--b < 0) {
-        i++;
-        b = 7;
-      }
-      j++;
-    }
-  }
-  get length() {
-    return this.limit;
-  }
-  get position() {
-    return this.bitPos;
-  }
-  seek(pos) {
-    if (pos < this.start || pos >= this.limit) {
-      illegalArgs(`seek pos out of bounds: ${pos}`);
-    }
-    this.pos = pos >>> 3;
-    this.bit = 8 - (pos & 7);
-    this.bitPos = pos;
-    return this;
-  }
-  read(wordSize = 1, safe = true) {
-    if (wordSize > 32) {
-      return this.read(wordSize - 32, safe) * U32 + this.read(32, safe);
-    } else if (wordSize > 8) {
-      let out = 0;
-      let n = wordSize & -8;
-      let msb = wordSize - n;
-      if (msb > 0) {
-        out = this._read(msb, safe);
-      }
-      while (n > 0) {
-        out = (out << 8 | this._read(8, safe)) >>> 0;
-        n -= 8;
-      }
-      return out;
-    } else {
-      return this._read(wordSize, safe);
-    }
-  }
-  readFields(fields, safe = true) {
-    return fields.map((word) => this.read(word, safe));
-  }
-  readWords(n, wordSize = 8, safe = true) {
-    let out = [];
-    while (n-- > 0) {
-      out.push(this.read(wordSize, safe));
-    }
-    return out;
-  }
-  readStruct(fields, safe = true) {
-    return fields.reduce((acc, [id, word]) => {
-      return acc[id] = this.read(word, safe), acc;
-    }, {});
-  }
-  readBit(safe = true) {
-    safe && this.checkLimit(1);
-    this.bit--;
-    this.bitPos++;
-    let out = this.buffer[this.pos] >>> this.bit & 1;
-    if (this.bit === 0) {
-      this.pos++;
-      this.bit = 8;
-    }
-    return out;
-  }
-  _read(wordSize, safe = true) {
-    safe && this.checkLimit(wordSize);
-    let l = this.bit - wordSize, out;
-    if (l >= 0) {
-      this.bit = l;
-      out = this.buffer[this.pos] >>> l & (1 << wordSize) - 1;
-      if (l === 0) {
-        this.pos++;
-        this.bit = 8;
-      }
-    } else {
-      out = (this.buffer[this.pos++] & (1 << this.bit) - 1) << -l;
-      this.bit = 8 + l;
-      out = out | this.buffer[this.pos] >>> this.bit;
-    }
-    this.bitPos += wordSize;
-    return out;
-  }
-  checkLimit(requested) {
-    if (this.bitPos + requested > this.limit) {
-      illegalState(`can't read past EOF`);
-    }
-  }
-};
-
 // ../../node_modules/qoa-format/lib/common.js
-var QOA_MIN_FILESIZE = 16;
 var QOA_SLICE_LEN = 20;
 var QOA_SLICES_PER_FRAME = 256;
 var QOA_FRAME_LEN = QOA_SLICES_PER_FRAME * QOA_SLICE_LEN;
@@ -168,106 +33,93 @@ var qoa_dequant_tab = qoa_scalefactor_tab.map((sf) => {
   return dqt.map((dq) => qoa_round(dq * sf));
 });
 
-// ../../node_modules/qoa-format/decode.js
-function decodeHeader(stream) {
-  const magic = stream.read(32);
-  if (magic !== QOA_MAGIC) {
-    throw new Error(`Not a QOA file; expected magic number 'qoaf'`);
-  }
-  const header = {
-    samples: stream.read(32),
-    channels: stream.read(8),
-    sampleRate: stream.read(24)
-  };
-  stream.seek(64);
-  return header;
-}
-function qoa_decode_frame(stream, audio, lmses, channelData, sampleOffset) {
-  const channels = stream.read(8);
-  const sampleRate = stream.read(24);
-  const samples = stream.read(16);
-  const frameSize = stream.read(16);
-  const dataSize = Math.floor(frameSize - 8 - QOA_LMS_LEN * 4 * channels);
-  const numSlices = Math.floor(dataSize / 8);
-  const maxTotalSamples = numSlices * QOA_SLICE_LEN;
-  if (channels != audio.channels || sampleRate != audio.sampleRate || samples * channels > maxTotalSamples) {
-    throw new Error(`invalid frame header data`);
-  }
-  for (let c = 0; c < channels; c++) {
-    const lms = lmses[c];
-    for (let i = 0; i < QOA_LMS_LEN; i++) {
-      let h = stream.read(16);
-      lms.history[i] = h;
-    }
-    for (let i = 0; i < QOA_LMS_LEN; i++) {
-      let w = stream.read(16);
-      lms.weights[i] = w;
-    }
-  }
-  for (let sample_index = 0; sample_index < samples; sample_index += QOA_SLICE_LEN) {
-    for (let c = 0; c < channels; c++) {
-      const scalefactor = stream.read(4);
-      const table = qoa_dequant_tab[scalefactor];
-      const slice_start = sample_index;
-      const slice_end = Math.min(sample_index + QOA_SLICE_LEN, samples);
-      const slice_count = slice_end - slice_start;
-      const lms = lmses[c];
-      const sampleData = channelData[c];
-      let idx = sampleOffset + slice_start;
-      const weights = lms.weights;
-      const history = lms.history;
-      let bitsRemaining = 60;
-      for (let i = 0; i < slice_count; i++) {
-        const predicted = qoa_lms_predict(weights, history);
-        const quantized = stream.read(3);
-        const dequantized = table[quantized];
-        const reconstructed = qoa_clamp(predicted + dequantized, -32768, 32767);
-        const sample = reconstructed < 0 ? reconstructed / 32768 : reconstructed / 32767;
-        sampleData[idx++] = sample;
-        qoa_lms_update(weights, history, reconstructed, dequantized);
-        bitsRemaining -= 3;
-      }
-      if (bitsRemaining > 0) {
-        stream.read(bitsRemaining);
-      }
-    }
-  }
-  return samples;
-}
-function decode(data) {
-  if (data.byteLength < QOA_MIN_FILESIZE) {
-    throw new Error(`QOA file size must be >= ${QOA_MIN_FILESIZE}`);
-  }
-  const stream = new BitInputStream(data);
-  const audio = decodeHeader(stream);
-  const channelData = [];
-  const lmses = [];
-  for (let c = 0; c < audio.channels; c++) {
-    const d = new Float32Array(audio.samples);
-    channelData.push(d);
-    lmses.push(LMS());
-  }
-  let sampleIndex = 0;
-  let frameLen = 0;
-  do {
-    frameLen = qoa_decode_frame(stream, audio, lmses, channelData, sampleIndex);
-    sampleIndex += frameLen;
-  } while (frameLen && sampleIndex < audio.samples);
-  return {
-    ...audio,
-    channelData
-  };
-}
-
 // src/decode-qoa.src.js
-var decodeQoa = (src) => decode(src instanceof Uint8Array ? src : new Uint8Array(src));
+var EMPTY = Object.freeze({ channelData: [], sampleRate: 0 });
+function decodeQoa(src) {
+  let out = decoder().decode(src instanceof Uint8Array ? src : new Uint8Array(src));
+  if (!out.channelData.length) throw new Error("QOA: no complete frame");
+  return out;
+}
 function decoder() {
+  let buf = new Uint8Array(0), header = false, total = 0, done = 0, rate = 0;
   return {
-    decode: decodeQoa,
-    flush: () => ({ channelData: [], sampleRate: 0 }),
-    free: () => {
+    decode(chunk) {
+      if (!chunk?.byteLength) return EMPTY;
+      if (!(chunk instanceof Uint8Array)) chunk = new Uint8Array(chunk.buffer ?? chunk, chunk.byteOffset ?? 0, chunk.byteLength);
+      buf = buf.length ? concat(buf, chunk) : chunk;
+      let out = [], p = 0;
+      if (!header) {
+        if (buf.length < 8) return EMPTY;
+        let dv = new DataView(buf.buffer, buf.byteOffset);
+        if (dv.getUint32(0) !== QOA_MAGIC) throw new Error("Not a QOA file; expected magic number 'qoaf'");
+        total = dv.getUint32(4);
+        header = true;
+        p = 8;
+      }
+      while (p + 8 <= buf.length && (!total || done < total)) {
+        let size = buf[p + 6] << 8 | buf[p + 7];
+        if (size < 8 || p + size > buf.length) break;
+        let f = frame(buf, p, size);
+        rate = f.sampleRate;
+        if (total && done + f.samples > total) f.channelData = f.channelData.map((c) => c.subarray(0, total - done));
+        done += f.channelData[0].length;
+        out.push(f.channelData);
+        p += size;
+      }
+      buf = buf.subarray(p);
+      if (!out.length) return EMPTY;
+      return { channelData: out.length === 1 ? out[0] : out[0].map((_, c) => join(out.map((o) => o[c]))), sampleRate: rate };
+    },
+    flush: () => EMPTY,
+    free() {
+      buf = new Uint8Array(0);
     }
   };
+}
+function frame(b, p, size) {
+  let channels = b[p], sampleRate = b[p + 1] << 16 | b[p + 2] << 8 | b[p + 3], samples = b[p + 4] << 8 | b[p + 5];
+  let slices = Math.floor((size - 8 - QOA_LMS_LEN * 4 * channels) / 8);
+  if (!channels || samples * channels > slices * QOA_SLICE_LEN) throw new Error("QOA: invalid frame header data");
+  let dv = new DataView(b.buffer, b.byteOffset + p), o = 8, lmses = [];
+  for (let c = 0; c < channels; c++) {
+    let lms = LMS();
+    for (let i = 0; i < QOA_LMS_LEN; i++, o += 2) lms.history[i] = dv.getInt16(o);
+    for (let i = 0; i < QOA_LMS_LEN; i++, o += 2) lms.weights[i] = dv.getInt16(o);
+    lmses.push(lms);
+  }
+  let channelData = Array.from({ length: channels }, () => new Float32Array(samples));
+  for (let s = 0; s < samples; s += QOA_SLICE_LEN) {
+    for (let c = 0; c < channels; c++, o += 8) {
+      let hi = dv.getUint32(o), lo = dv.getUint32(o + 4), table = qoa_dequant_tab[hi >>> 28];
+      let { weights, history } = lmses[c], out = channelData[c], n = Math.min(QOA_SLICE_LEN, samples - s);
+      for (let i = 0; i < n; i++) {
+        let sh = 57 - 3 * i;
+        let q = sh >= 32 ? hi >>> sh - 32 & 7 : sh + 3 <= 32 ? lo >>> sh & 7 : (hi << 32 - sh | lo >>> sh) & 7;
+        let predicted = qoa_lms_predict(weights, history), dequantized = table[q];
+        let r = qoa_clamp(predicted + dequantized, -32768, 32767);
+        out[s + i] = r < 0 ? r / 32768 : r / 32767;
+        qoa_lms_update(weights, history, r, dequantized);
+      }
+    }
+  }
+  return { channelData, sampleRate, samples };
+}
+function concat(a, b) {
+  let o = new Uint8Array(a.length + b.length);
+  o.set(a);
+  o.set(b, a.length);
+  return o;
+}
+function join(parts) {
+  let n = 0;
+  for (let p of parts) n += p.length;
+  let o = new Float32Array(n);
+  n = 0;
+  for (let p of parts) {
+    o.set(p, n);
+    n += p.length;
+  }
+  return o;
 }
 export {
   decoder,

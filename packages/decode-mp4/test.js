@@ -72,6 +72,23 @@ t('streaming: chunks equal whole-file (moov after mdat, 1000-byte chunks)', asyn
 	}
 })
 
+// Fragmented files (ISO/IEC 14496-12 §8.8), made by FFmpeg (-movflags frag_keyframe+empty_moov,
+// 100 ms fragments): the samples live in moof+mdat pairs, read the same whole or chunked
+t('fragmented: moof+mdat samples decode, whole and in 1000-byte chunks', async () => {
+	for (let [f, same] of [['frag-flac.mp4', exact], ['frag-pcm16.mp4', exact], ['frag-aac.mp4', null]]) {
+		let buf = fx(f), whole = await decode(buf)
+		is(whole.sampleRate, 48000, f + ': rate')
+		if (same) ok(same(whole.channelData[0], ref.channelData[0]) && same(whole.channelData[1], ref.channelData[1]), f + ': lossless ≡ ref.wav')
+		else ok(whole.channelData[0].length >= ref.channelData[0].length && Math.abs(rms(whole.channelData[0]) - rms(ref.channelData[0])) < 0.02, f + ': aac, loudness kept')
+		let dec = await decoder(), parts = []
+		for (let i = 0; i < buf.length; i += 1000) { let r = await dec.decode(buf.subarray(i, i + 1000)); if (r.channelData.length) parts.push(r.channelData[0]) }
+		let r = await dec.flush(); if (r.channelData.length) parts.push(r.channelData[0])
+		dec.free()
+		let n = parts.reduce((t, p) => t + p.length, 0)
+		is(n, whole.channelData[0].length, f + ': chunked ≡ whole')
+	}
+})
+
 t('rejects non-MP4 and empty input', async () => {
 	let err
 	try { await decode(new Uint8Array(100)) } catch (e) { err = e }

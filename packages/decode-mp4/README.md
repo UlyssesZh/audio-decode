@@ -33,7 +33,7 @@ dec.free()
 | `dtsc`, `dtsh`, `dtsl`, `dtse`, `mp4a` (0xA9) | DTS (core) | [@audio/decode-dts](../decode-dts) |
 | `ec-3`, `mp4a` (0xA6) | E-AC-3 (Dolby Digital Plus) | [@audio/decode-eac3](../decode-eac3) |
 
-TrueHD tracks throw an error naming the codec. Fragmented MP4 (`moof`) is not supported. QuickTime sound descriptions v0, v1 and v2 are handled, including `wave`-wrapped configs and `enda` endianness flags. When `moov` follows `mdat` (typical of camera and QuickTime output) the file is buffered until the header arrives.
+TrueHD tracks throw an error naming the codec. Fragmented MP4 (ISO/IEC 14496-12 §8.8, `moof`+`mdat` after an empty-table `moov`) streams fragment by fragment, holding only the bytes not yet read. QuickTime sound descriptions v0, v1 and v2 are handled, including `wave`-wrapped configs and `enda` endianness flags. When `moov` follows `mdat` (typical of camera and QuickTime output) the file is buffered until the header arrives.
 
 Codec packages are imported dynamically, which is unavailable inside an AudioWorklet — decode in the main thread or a Worker.
 
