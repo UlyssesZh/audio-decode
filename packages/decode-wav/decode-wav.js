@@ -138,36 +138,58 @@ function decodeRaw(raw, hdr) {
 	let frames = Math.floor(raw.length / blockSize)
 	if (!frames) return EMPTY
 	let ch = Array.from({ length: nCh }, () => new Float32Array(frames))
-	let dv = new DataView(raw.buffer, raw.byteOffset, raw.byteLength)
-	let p = 0
+	let n = frames * nCh, p = 0
 	let isFloat = codec === 'float'
+	// Samples de-interleave channel by channel (sample i of channel c is element i·nCh + c).
+	// Integer PCM scales asymmetrically: negatives by 2^-(bits-1), positives by 1/(2^(bits-1) − 1).
+	// 8/16-bit read every code's value from a table. 24-bit multiplies by the reciprocal, which
+	// rounds to the same float32 as dividing (checked exhaustively); 32-bit keeps the division.
 	if (codec === 'alaw' || codec === 'ulaw') {
 		let tbl = codec === 'alaw' ? ALAW_TBL : ULAW_TBL
 		for (let i = 0; i < frames; i++) for (let c = 0; c < nCh; c++) ch[c][i] = tbl[raw[p++]] / 32768
-	} else if (isFloat && bitDepth === 64) {
-		for (let i = 0; i < frames; i++) for (let c = 0; c < nCh; c++) { ch[c][i] = dv.getFloat64(p, true); p += 8 }
-	} else if (isFloat && bitDepth === 32) {
-		for (let i = 0; i < frames; i++) for (let c = 0; c < nCh; c++) { ch[c][i] = dv.getFloat32(p, true); p += 4 }
+	} else if (isFloat && (bitDepth === 64 || bitDepth === 32)) {
+		let s = samples(raw, bitDepth === 64 ? Float64Array : Float32Array, n)
+		for (let c = 0; c < nCh; c++) for (let x = ch[c], i = 0, k = c; i < frames; i++, k += nCh) x[i] = s[k]
 	} else if (bitDepth === 8) {
-		for (let i = 0; i < frames; i++) for (let c = 0; c < nCh; c++) {
-			let v = raw[p++] - 128; ch[c][i] = v < 0 ? v / 128 : v / 127
-		}
+		let t = U8_TBL ??= scale(256, u => u - 128, 128, 127)
+		for (let c = 0; c < nCh; c++) for (let x = ch[c], i = 0, k = c; i < frames; i++, k += nCh) x[i] = t[raw[k]]
 	} else if (bitDepth === 16) {
-		for (let i = 0; i < frames; i++) for (let c = 0; c < nCh; c++) {
-			let v = dv.getInt16(p, true); p += 2; ch[c][i] = v < 0 ? v / 32768 : v / 32767
-		}
+		let s = samples(raw, Uint16Array, n), t = S16_TBL ??= scale(65536, u => u << 16 >> 16, 32768, 32767)
+		for (let c = 0; c < nCh; c++) for (let x = ch[c], i = 0, k = c; i < frames; i++, k += nCh) x[i] = t[s[k]]
 	} else if (bitDepth === 24) {
-		for (let i = 0; i < frames; i++) for (let c = 0; c < nCh; c++) {
-			let v = raw[p] | (raw[p + 1] << 8) | (raw[p + 2] << 16); p += 3
-			if (v >= 0x800000) v -= 0x1000000
-			ch[c][i] = v < 0 ? v / 8388608 : v / 8388607
+		for (let c = 0; c < nCh; c++) for (let x = ch[c], i = 0, k = c * 3; i < frames; i++, k += nCh * 3) {
+			let v = (raw[k] | raw[k + 1] << 8 | raw[k + 2] << 16) << 8 >> 8
+			x[i] = v * (v < 0 ? 1 / 8388608 : 1 / 8388607)
 		}
 	} else if (bitDepth === 32) {
-		for (let i = 0; i < frames; i++) for (let c = 0; c < nCh; c++) {
-			let v = dv.getInt32(p, true); p += 4; ch[c][i] = v < 0 ? v / 2147483648 : v / 2147483647
+		let s = samples(raw, Int32Array, n)
+		for (let c = 0; c < nCh; c++) for (let x = ch[c], i = 0, k = c; i < frames; i++, k += nCh) {
+			let v = s[k]; x[i] = v < 0 ? v / 2147483648 : v / 2147483647
 		}
 	} else { throw TypeError('Unsupported WAV bit depth: ' + bitDepth) }
 	return { channelData: ch, sampleRate }
+}
+
+// Sample value of every 8/16-bit code, built on first use
+let U8_TBL = null, S16_TBL = null
+function scale(n, signed, neg, pos) {
+	let t = new Float32Array(n)
+	for (let u = 0; u < n; u++) { let v = signed(u); t[u] = v < 0 ? v / neg : v / pos }
+	return t
+}
+
+const LE = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1
+
+/** The first n little-endian samples of raw as a native typed array: an aligned copy when raw's
+ *  offset isn't a multiple of the sample size, byte-swapped on a big-endian host. */
+function samples(raw, T, n) {
+	let w = T.BYTES_PER_ELEMENT, len = n * w
+	if (!LE) {
+		let b = new Uint8Array(len)
+		for (let i = 0; i < len; i += w) for (let j = 0; j < w; j++) b[i + j] = raw[i + w - 1 - j]
+		raw = b
+	} else if (raw.byteOffset % w) raw = raw.slice(0, len)
+	return new T(raw.buffer, raw.byteOffset, n)
 }
 
 // IMA/DVI ADPCM — per channel: 4-byte header (predictor int16 + step index), then

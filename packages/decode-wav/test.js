@@ -294,6 +294,46 @@ for (let name of ['ima_mono', 'ms_mono', 'ima_stereo', 'ms_stereo']) {
 	if (nCh === 2) ok(corr(r.channelData[1].subarray(0, win), sine(win, 660, 22050)) > 0.99, `${name}: ch1 ≈ 660Hz`)
 }
 
+// ===== sample coding at every depth, data at an odd offset, streamed at odd splits =====
+// Negative codes scale by 2^-(bits-1), positive by 1/(2^(bits-1) - 1), float passes through. A 3-byte chunk
+// before `data` puts the samples at an odd byte offset; 3 channels make frames of odd size; splits cut frames.
+{
+	let oddWav = (bits, float, frames) => {
+		let bps = bits / 8, nCh = frames[0].length, data = frames.length * nCh * bps
+		let b = new Uint8Array(12 + 24 + 8 + 3 + 8 + data), dv = new DataView(b.buffer), p = 0
+		let s = t => { for (let c of t) b[p++] = c.charCodeAt(0) }, u16 = x => { dv.setUint16(p, x, true); p += 2 }, u32 = x => { dv.setUint32(p, x, true); p += 4 }
+		s('RIFF'); u32(b.length - 8); s('WAVE')
+		s('fmt '); u32(16); u16(float ? 3 : 1); u16(nCh); u32(8000); u32(8000 * nCh * bps); u16(nCh * bps); u16(bits)
+		s('junk'); u32(3); p += 3
+		s('data'); u32(data)
+		for (let f of frames) for (let v of f) {
+			if (float) bits === 64 ? dv.setFloat64(p, v, true) : dv.setFloat32(p, v, true)
+			else if (bits === 8) dv.setUint8(p, v)
+			else if (bits === 16) dv.setInt16(p, v, true)
+			else if (bits === 24) { b[p] = v & 255; b[p + 1] = v >> 8 & 255; b[p + 2] = v >> 16 & 255 }
+			else dv.setInt32(p, v, true)
+			p += bps
+		}
+		return b
+	}
+	let codes = { 8: [0, 255, 128, 127, 1], 16: [-32768, 32767, 0, -1, 1], 24: [-8388608, 8388607, 0, -1, 1], 32: [-2147483648, 2147483647, 0, -1, 1] }
+	let value = (bits, v) => { if (bits === 8) v -= 128; return v < 0 ? v / 2 ** (bits - 1) : v / (2 ** (bits - 1) - 1) }
+	let join = parts => parts[0].map((_, c) => { let x = new Float32Array(parts.reduce((n, p) => n + p[c].length, 0)), o = 0; for (let p of parts) { x.set(p[c], o); o += p[c].length } return x })
+	for (let [bits, float] of [[8, false], [16, false], [24, false], [32, false], [32, true], [64, true]]) {
+		let col = float ? [1, -1, 0.25, -0.5, 3] : codes[bits], n = col.length
+		let frames = col.map((v, i) => [v, col[n - 1 - i], col[(i + 2) % n]])
+		let bytes = oddWav(bits, float, frames), { channelData } = decode(bytes)
+		let want = c => Float32Array.from(frames, f => float ? f[c] : value(bits, f[c]))
+		ok(channelData.length === 3 && channelData.every((x, c) => x.length === n && x.every((v, i) => v === want(c)[i])), `${bits}-bit ${float ? 'float' : 'int'}: every code's value, data at an odd offset`)
+		for (let step of [1, 5, 7, 4096]) {
+			let d = decoder(), parts = []
+			for (let o = 0; o < bytes.length; o += step) { let r = d.decode(bytes.subarray(o, o + step)); if (r.channelData.length) parts.push(r.channelData) }
+			let got = join(parts)
+			ok(got.every((x, c) => x.length === n && x.every((v, i) => v === channelData[c][i])), `${bits}-bit ${float ? 'float' : 'int'}: streamed in ${step}-byte slices ≡ whole`)
+		}
+	}
+}
+
 // ===== error handling =====
 
 {
