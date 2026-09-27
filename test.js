@@ -89,6 +89,69 @@ t('flac', async () => {
 	is(near(rms(r.channelData[0]), 0.1298, 0.001), true, 'rms lossless')
 })
 
+// FLAC in Ogg (flac --ogg) is FLAC: audio-type routes it to the FLAC decoder, which reads Ogg pages
+t('ogg flac through decode()', async () => {
+	let r = await decode(shortOggFlac), dec = await flacDecoder(), ref = dec.decode(shortOggFlac)
+	dec.free()
+	is(r.sampleRate, 48000)
+	is(r.channelData[0].length, 12000)
+	is([...r.channelData[0]], [...ref.channelData[0]], 'same samples as the FLAC decoder')
+})
+
+// Page boundaries of an Ogg stream: every page's end offset.
+function oggPageEnds(b) {
+	let ends = []
+	for (let o = 0; o + 27 <= b.length;) {
+		let body = o + 27 + b[o + 26], end = body
+		for (let i = o + 27; i < body; i++) end += b[i]
+		ends.push(o = end)
+	}
+	return ends
+}
+
+// A stream cut anywhere decodes up to its last whole page: no throw, an exact prefix of the whole decode, never
+// shorter for a longer cut. Cuts at every page boundary −1/0/+1 and inside each header's granule position (+13),
+// where codec-parser's flush once read past the end (RangeError) or built a page from a partial body (garbage).
+t('ogg cut anywhere: vorbis, opus, flac decode to their last whole page', async () => {
+	for (let [name, buf] of [['vorbis', shortOgg], ['opus', new Uint8Array(opus)], ['flac', shortOggFlac]]) {
+		let whole = (await decode(buf)).channelData[0], ends = oggPageEnds(buf)
+		let cuts = [...new Set(ends.flatMap(e => [e - 1, e, e + 1, e + 13]))].filter(c => c > ends[1] && c < buf.length).sort((a, b) => a - b)
+		let prev = 0, bad = []
+		for (let cut of cuts) {
+			let r
+			try { r = (await decode(buf.subarray(0, cut))).channelData[0] ?? new Float32Array(0) }
+			catch (e) { bad.push(`${cut}: ${e.message}`); continue }
+			if (r.length < prev || r.length > whole.length || r.some((v, i) => v !== whole[i])) bad.push(`${cut}: ${r.length} samples, not a prefix`)
+			prev = r.length
+		}
+		is(bad, [], `${name}: ${cuts.length} cuts`)
+	}
+})
+
+// Fed a byte at a time, or 7, with an empty chunk before each, a stream decodes as it does whole; two Opus streams back to back each end on their own
+// granule position (codec-parser counts samples across chained streams).
+t('ogg streamed in small chunks; chained opus', async () => {
+	const join = rs => { let n = rs.reduce((s, r) => s + (r.channelData[0]?.length || 0), 0), out = new Float32Array(n), o = 0; for (let r of rs) if (r.channelData[0]) out.set(r.channelData[0], o), o += r.channelData[0].length; return out }
+	const { decoder: opusDecoder } = await import('@audio/decode-opus')
+	for (let [name, buf, make] of [['vorbis', shortOgg, vorbisDecoder], ['flac', shortOggFlac, flacDecoder]]) {
+		let whole = (await decode(buf)).channelData[0]
+		for (let size of [1, 7]) {
+			let dec = await make(), rs = []
+			for (let o = 0; o < buf.length; o += size) rs.push(dec.decode(new Uint8Array(0)), dec.decode(buf.subarray(o, o + size)))
+			rs.push(dec.flush()); dec.free()
+			is([...join(rs)], [...whole], `${name} in ${size}-byte chunks`)
+		}
+	}
+	let one = new Uint8Array(opus), two = new Uint8Array(one.length * 2), whole = (await decode(one)).channelData[0]
+	two.set(one); two.set(one, one.length)
+	let dec = await opusDecoder(), rs = []
+	for (let o = 0; o < two.length; o += 4096) rs.push(dec.decode(two.subarray(o, o + 4096)))
+	rs.push(dec.flush()); dec.free()
+	let both = join(rs)
+	is(both.length, 2 * whole.length, 'chained opus: twice the length')
+	is(both.subarray(whole.length).every((v, i) => Math.abs(v - whole[i]) < 1e-6), true, 'the second stream decodes as the first')
+})
+
 t('reusable complete ogg flac', async () => {
 	let dec = await flacDecoder()
 	for (let i = 0; i < 2; i++) {

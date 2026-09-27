@@ -5,6 +5,7 @@
 // build.sh maps the package to its non-worker default export.
 import FLACDecoder from '@wasm-audio-decoders/flac'
 import CodecParser, { data, totalSamples, codecFrames, isLastPage } from 'codec-parser'
+import { oggPages } from '../../_build/ogg.js'
 
 const EMPTY = Object.freeze({ channelData: Object.freeze([]), sampleRate: 0 })
 
@@ -31,7 +32,7 @@ export async function decoder() {
 		upstream.free()
 		throw Error('Unsupported @wasm-audio-decoders/flac internals')
 	}
-	let parser = null, prefix = null, lookahead = null, ogg = false, total = 0, fresh = true
+	let parser = null, prefix = null, lookahead = null, ogg = false, pages = oggPages(), total = 0, fresh = true
 	let pendingRaw = false, duplicateFrames = 0, ended = false, freed = false
 
 	let resetStream = () => {
@@ -40,7 +41,7 @@ export async function decoder() {
 		for (let output of outputs) output.buf.fill(0)
 		codec._decoder = wasm.create_decoder(...outputs.map(output => output.ptr))
 		if (!codec._decoder) throw Error('Could not reset FLAC decoder')
-		parser = null; prefix = null; lookahead = null; ogg = false; total = 0; fresh = true
+		parser = null; prefix = null; lookahead = null; ogg = false; pages = oggPages(); total = 0; fresh = true
 		pendingRaw = false; duplicateFrames = 0
 	}
 
@@ -120,7 +121,7 @@ export async function decoder() {
 			}
 		}
 
-		let r = decodeItems([...parser.parseChunk(buf)])
+		let r = decodeItems([...parser.parseChunk(ogg ? pages.push(buf) : buf)])
 		return hasAudio(r) ? r : EMPTY
 	}
 

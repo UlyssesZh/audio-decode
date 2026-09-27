@@ -5,6 +5,7 @@
 // build.sh maps the package to its non-worker default export.
 import OggVorbisDecoder from '@wasm-audio-decoders/ogg-vorbis'
 import CodecParser, { data, totalSamples, codecFrames, header, vorbisSetup, isLastPage } from 'codec-parser'
+import { oggPages } from '../../_build/ogg.js'
 
 const EMPTY = Object.freeze({ channelData: Object.freeze([]), sampleRate: 0 })
 
@@ -42,7 +43,7 @@ export async function decoder() {
 		onCodec: c => { if (c !== 'vorbis') throw Error('@audio/decode-vorbis does not support this codec ' + c) },
 		enableFrameCRC32: false
 	})
-	let parser = createParser(), setup = true, total = 0, fresh = true
+	let parser = createParser(), pages = oggPages(), setup = true, total = 0, fresh = true
 	let resetPending = false, ended = false, freed = false
 
 	let resetCodec = () => {
@@ -55,7 +56,7 @@ export async function decoder() {
 
 	let startStream = () => {
 		resetCodec()
-		parser = createParser(); setup = true; total = 0; fresh = true; resetPending = false
+		parser = createParser(); pages = oggPages(); setup = true; total = 0; fresh = true; resetPending = false
 	}
 
 	let decodePages = (pages) => {
@@ -111,7 +112,7 @@ export async function decoder() {
 		}
 
 		fresh = false
-		let r = decodePages([...parser.parseChunk(buf)])
+		let r = decodePages([...parser.parseChunk(pages.push(buf))])
 		return hasAudio(r) ? r : EMPTY
 	}
 

@@ -2879,10 +2879,10 @@ var FLACDecoder = class {
   [decodeFlac](flacFrames) {
     return this._decoder.decodeFrames(flacFrames.map((f) => f[data2] || f));
   }
-  [decodeOggFlac](oggPages) {
-    const frames = oggPages.map((page2) => page2[codecFrames2].map((f) => f[data2])).flat();
+  [decodeOggFlac](oggPages2) {
+    const frames = oggPages2.map((page2) => page2[codecFrames2].map((f) => f[data2])).flat();
     const decoded = this._decoder.decodeFrames(frames);
-    const oggPage = oggPages[oggPages.length - 1];
+    const oggPage = oggPages2[oggPages2.length - 1];
     if (oggPage && oggPage[isLastPage2]) {
       const samplesToTrim = this[totalSamplesDecoded] - oggPage[totalSamples2];
       if (samplesToTrim > 0) {
@@ -2935,6 +2935,44 @@ var FLACDecoder = class {
   }
 };
 
+// ../_build/ogg.js
+init_text_decoder();
+var isPage = (b, o) => b[o] === 79 && b[o + 1] === 103 && b[o + 2] === 103 && b[o + 3] === 83;
+function whole(buf) {
+  let o = 0;
+  while (o + 27 <= buf.length) {
+    if (!isPage(buf, o)) {
+      let k = o + 1;
+      while (k + 4 <= buf.length && !isPage(buf, k)) k++;
+      if (k + 4 > buf.length) return Math.max(o, buf.length - 3);
+      o = k;
+      continue;
+    }
+    let body = o + 27 + buf[o + 26], end = body;
+    if (body > buf.length) break;
+    for (let i = o + 27; i < body; i++) end += buf[i];
+    if (end > buf.length) break;
+    o = end;
+  }
+  return o;
+}
+function oggPages() {
+  let tail = null;
+  return {
+    push(chunk) {
+      let buf = tail ? concat(tail, chunk) : chunk, n = whole(buf);
+      tail = n < buf.length ? buf.slice(n) : null;
+      return buf.subarray(0, n);
+    }
+  };
+}
+function concat(a, b) {
+  let out = new Uint8Array(a.length + b.length);
+  out.set(a);
+  out.set(b, a.length);
+  return out;
+}
+
 // src/decode-flac.src.js
 var EMPTY = Object.freeze({ channelData: Object.freeze([]), sampleRate: 0 });
 async function decode(src) {
@@ -2966,7 +3004,7 @@ async function decoder() {
     upstream.free();
     throw Error("Unsupported @wasm-audio-decoders/flac internals");
   }
-  let parser = null, prefix = null, lookahead = null, ogg = false, total2 = 0, fresh = true;
+  let parser = null, prefix = null, lookahead = null, ogg = false, pages = oggPages(), total2 = 0, fresh = true;
   let pendingRaw = false, duplicateFrames = 0, ended = false, freed = false;
   let resetStream = () => {
     wasm.destroy_decoder(codec2._decoder);
@@ -2978,6 +3016,7 @@ async function decoder() {
     prefix = null;
     lookahead = null;
     ogg = false;
+    pages = oggPages();
     total2 = 0;
     fresh = true;
     pendingRaw = false;
@@ -3058,7 +3097,7 @@ async function decoder() {
         }
       }
     }
-    let r = decodeItems([...parser.parseChunk(buf)]);
+    let r = decodeItems([...parser.parseChunk(ogg ? pages.push(buf) : buf)]);
     return hasAudio(r) ? r : EMPTY;
   };
   upstream.flush = () => {

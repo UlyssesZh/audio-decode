@@ -2768,10 +2768,10 @@ var OggVorbisDecoder = class {
   free() {
     this._decoder.free();
   }
-  async decodeOggPages(oggPages) {
+  async decodeOggPages(oggPages2) {
     const packets = [];
-    for (let i = 0; i < oggPages.length; i++) {
-      const oggPage2 = oggPages[i];
+    for (let i = 0; i < oggPages2.length; i++) {
+      const oggPage2 = oggPages2[i];
       if (this._vorbisSetupInProgress) {
         if (oggPage2[data2][0] === 1) {
           this._decoder.sendSetupHeader(oggPage2[data2]);
@@ -2787,7 +2787,7 @@ var OggVorbisDecoder = class {
     }
     const decoded = await this._decoder.decodePackets(packets);
     this._totalSamplesDecoded += decoded.samplesDecoded;
-    const oggPage = oggPages[oggPages.length - 1];
+    const oggPage = oggPages2[oggPages2.length - 1];
     if (oggPage && oggPage[isLastPage2]) {
       const samplesToTrim = this._totalSamplesDecoded - oggPage[totalSamples2];
       if (samplesToTrim > 0) {
@@ -2818,6 +2818,43 @@ var OggVorbisDecoder = class {
     return decoded;
   }
 };
+
+// ../_build/ogg.js
+var isPage = (b, o) => b[o] === 79 && b[o + 1] === 103 && b[o + 2] === 103 && b[o + 3] === 83;
+function whole(buf) {
+  let o = 0;
+  while (o + 27 <= buf.length) {
+    if (!isPage(buf, o)) {
+      let k = o + 1;
+      while (k + 4 <= buf.length && !isPage(buf, k)) k++;
+      if (k + 4 > buf.length) return Math.max(o, buf.length - 3);
+      o = k;
+      continue;
+    }
+    let body = o + 27 + buf[o + 26], end = body;
+    if (body > buf.length) break;
+    for (let i = o + 27; i < body; i++) end += buf[i];
+    if (end > buf.length) break;
+    o = end;
+  }
+  return o;
+}
+function oggPages() {
+  let tail = null;
+  return {
+    push(chunk) {
+      let buf = tail ? concat(tail, chunk) : chunk, n = whole(buf);
+      tail = n < buf.length ? buf.slice(n) : null;
+      return buf.subarray(0, n);
+    }
+  };
+}
+function concat(a, b) {
+  let out = new Uint8Array(a.length + b.length);
+  out.set(a);
+  out.set(b, a.length);
+  return out;
+}
 
 // src/decode-vorbis.src.js
 var EMPTY = Object.freeze({ channelData: Object.freeze([]), sampleRate: 0 });
@@ -2854,7 +2891,7 @@ async function decoder() {
     },
     enableFrameCRC32: false
   });
-  let parser = createParser(), setup = true, total2 = 0, fresh = true;
+  let parser = createParser(), pages = oggPages(), setup = true, total2 = 0, fresh = true;
   let resetPending = false, ended = false, freed = false;
   let resetCodec = () => {
     if (wasm.HEAP.byteLength < initialMemory.length)
@@ -2866,15 +2903,16 @@ async function decoder() {
   let startStream = () => {
     resetCodec();
     parser = createParser();
+    pages = oggPages();
     setup = true;
     total2 = 0;
     fresh = true;
     resetPending = false;
   };
-  let decodePages = (pages) => {
-    if (!pages.length) return null;
+  let decodePages = (pages2) => {
+    if (!pages2.length) return null;
     let packets = [];
-    for (let page3 of pages) {
+    for (let page3 of pages2) {
       if (setup) {
         if (page3[data2][0] === 1) codec2.sendSetupHeader(page3[data2]);
         if (page3[codecFrames2].length) {
@@ -2889,7 +2927,7 @@ async function decoder() {
     if (!packets.length) return null;
     let decoded = codec2.decodePackets(packets);
     total2 += decoded.samplesDecoded;
-    let page2 = pages[pages.length - 1];
+    let page2 = pages2[pages2.length - 1];
     if (page2?.[isLastPage2]) {
       let trim = total2 - page2[totalSamples2];
       if (trim > 0) {
@@ -2916,7 +2954,7 @@ async function decoder() {
       return hasAudio(r2) ? r2 : EMPTY;
     }
     fresh = false;
-    let r = decodePages([...parser.parseChunk(buf)]);
+    let r = decodePages([...parser.parseChunk(pages.push(buf))]);
     return hasAudio(r) ? r : EMPTY;
   };
   upstream.flush = () => {

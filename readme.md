@@ -175,6 +175,7 @@ worker.onmessage = ({ data }) => { /* { channelData, sampleRate } */ }
 
 ## See also
 
+* [audio](https://github.com/audiojs/audio) – edit, measure and save: trim, loudness to spec, delivery checks, a CLI.
 * [encode](https://github.com/audiojs/encode) – encode PCM into any audio format.
 * [audio-type](https://github.com/audiojs/audio-type) – detect audio format from buffer.
 <!--

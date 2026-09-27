@@ -16,6 +16,7 @@ import CodecParser, {
 	streamCount,
 	totalSamples
 } from 'codec-parser'
+import { oggPages } from '../../_build/ogg.js'
 import { createOpusDecoder } from '../core.js'
 
 const EMPTY = Object.freeze({ channelData: Object.freeze([]), sampleRate: 0 })
@@ -32,11 +33,12 @@ export default async function decode(src) {
 
 export async function decoder() {
 	let core = await createOpusDecoder()
+	let pages = oggPages()
 	let parser = new CodecParser('application/ogg', {
 		onCodec: codec => { if (codec !== 'opus') throw Error('@audio/decode-opus does not support this codec ' + codec) },
 		enableFrameCRC32: false
 	})
-	let configured = false, total = 0, ended = false, freed = false
+	let configured = false, total = 0, base = 0, ended = false, freed = false
 
 	let decodePages = pages => {
 		let results = []
@@ -65,7 +67,8 @@ export async function decoder() {
 
 			if (page[isLastPage]) {
 				if (page[absoluteGranulePosition] !== undefined && results.length) {
-					let trim = total - page[totalSamples]
+					// codec-parser counts samples across chained streams: this stream's own count starts at `base`
+					let trim = total - (page[totalSamples] - base)
 					if (trim > 0) {
 						let decoded = results[results.length - 1]
 						let keep = Math.max(0, decoded.samplesDecoded - trim)
@@ -73,6 +76,7 @@ export async function decoder() {
 						decoded.samplesDecoded = keep
 					}
 				}
+				base = page[totalSamples]
 				core.unconfigure()
 				configured = false
 				total = 0
@@ -88,7 +92,7 @@ export async function decoder() {
 			if (!chunk) return EMPTY
 			let buf = chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk)
 			if (!buf.length) return EMPTY
-			return decodePages([...parser.parseChunk(buf)])
+			return decodePages([...parser.parseChunk(pages.push(buf))])
 		},
 		flush() {
 			if (freed || ended) return EMPTY
