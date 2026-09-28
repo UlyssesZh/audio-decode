@@ -9,6 +9,17 @@ import { oggPages } from '../../_build/ogg.js'
 
 const EMPTY = Object.freeze({ channelData: Object.freeze([]), sampleRate: 0 })
 
+// The upstream glue scales a code by 1/(2^(bits-1) − 1). Back to the code, then 2^-(bits-1), as ffmpeg,
+// libsndfile and the family's other decoders and encoders: -32768 reads -1 (was -1.00003), and a
+// lossless round trip through any of the family's encoders is the identity.
+function rescale(d) {
+	let bits = d?.bitDepth
+	if (!bits || bits >= 32 || !d.channelData) return d
+	let full = 2 ** (bits - 1), up = full - 1
+	for (let ch of d.channelData) for (let i = 0; i < ch.length; i++) ch[i] = Math.round(ch[i] * up) / full
+	return d
+}
+
 export default async function decode(src) {
 	let buf = src instanceof Uint8Array ? src : new Uint8Array(src)
 	let dec = await decoder()
@@ -51,10 +62,10 @@ export async function decoder() {
 			items = items.slice(skip); duplicateFrames -= skip
 		}
 		if (!items.length) return null
-		if (!ogg) return codec.decodeFrames(items.map(f => f[data] || f))
+		if (!ogg) return rescale(codec.decodeFrames(items.map(f => f[data] || f)))
 
 		let frames = items.flatMap(p => p[codecFrames].map(f => f[data]))
-		let decoded = codec.decodeFrames(frames)
+		let decoded = rescale(codec.decodeFrames(frames))
 		total += decoded.samplesDecoded
 		let page = items[items.length - 1]
 		if (page?.[isLastPage]) {

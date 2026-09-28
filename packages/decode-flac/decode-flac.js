@@ -2975,6 +2975,13 @@ function concat(a, b) {
 
 // src/decode-flac.src.js
 var EMPTY = Object.freeze({ channelData: Object.freeze([]), sampleRate: 0 });
+function rescale(d) {
+  let bits = d?.bitDepth;
+  if (!bits || bits >= 32 || !d.channelData) return d;
+  let full = 2 ** (bits - 1), up = full - 1;
+  for (let ch of d.channelData) for (let i = 0; i < ch.length; i++) ch[i] = Math.round(ch[i] * up) / full;
+  return d;
+}
 async function decode(src) {
   let buf = src instanceof Uint8Array ? src : new Uint8Array(src);
   let dec = await decoder();
@@ -3029,9 +3036,9 @@ async function decoder() {
       duplicateFrames -= skip;
     }
     if (!items.length) return null;
-    if (!ogg) return codec2.decodeFrames(items.map((f) => f[data2] || f));
+    if (!ogg) return rescale(codec2.decodeFrames(items.map((f) => f[data2] || f)));
     let frames = items.flatMap((p) => p[codecFrames2].map((f) => f[data2]));
-    let decoded = codec2.decodeFrames(frames);
+    let decoded = rescale(codec2.decodeFrames(frames));
     total2 += decoded.samplesDecoded;
     let page2 = items[items.length - 1];
     if (page2?.[isLastPage2]) {

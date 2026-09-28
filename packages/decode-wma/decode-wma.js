@@ -1,6 +1,6 @@
 /**
- * WMA decoder — ASF demuxer (pure JS) + RockBox wmadec (WASM)
- * Decodes WMA v1/v2 in ASF containers
+ * WMA decoder — ASF demuxer (pure JS) + FFmpeg's WMA decoders (libavcodec, WASM)
+ * Decodes WMA v1, v2, Pro and Lossless in ASF containers
  *
  * let { channelData, sampleRate } = await decode(wmabuf)
  */
@@ -342,7 +342,10 @@ export default async function decode(src) {
 	let buf = src instanceof Uint8Array ? src : new Uint8Array(src)
 	let dec = await decoder()
 	try {
-		return dec.decode(buf)
+		let a = dec.decode(buf), b = dec.flush()
+		if (!b.channelData.length) return a
+		if (!a.channelData.length) return b
+		return { channelData: a.channelData.map((x, c) => { let y = new Float32Array(x.length + b.channelData[c].length); y.set(x); y.set(b.channelData[c], x.length); return y }), sampleRate: a.sampleRate }
 	} finally {
 		dec.free()
 	}
@@ -480,6 +483,15 @@ class WMADecoder {
 		let r = EMPTY
 		if (this._left && this._meta && !this._meta.packetSize) r = this._decodePkts([this._left], this._meta)
 		this._left = null
+		// the decoder holds its last frame's overlap: drain it (the end of the audio, as ffmpeg decodes it)
+		if (this.h && !this._drained) {
+			this._drained = true
+			let m = this.m, out = m._wma_decode(this.h, 0, 0), n = out ? m._wma_samples() : 0, ch = m._wma_channels() || this.ch
+			if (n) {
+				let spc = n / ch, tail = Array.from({ length: ch }, (_, c) => { let x = new Float32Array(spc), d = new Float32Array(m.HEAPF32.buffer, out, n); for (let s = 0; s < spc; s++) x[s] = d[s * ch + c]; return x })
+				r = r.channelData.length ? { channelData: r.channelData.map((x, c) => { let y = new Float32Array(x.length + spc); y.set(x); y.set(tail[c], x.length); return y }), sampleRate: this.sr } : { channelData: tail, sampleRate: this.sr }
+			}
+		}
 		return r
 	}
 

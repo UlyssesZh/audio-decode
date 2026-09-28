@@ -99,13 +99,11 @@ class WavpackDecoder {
 			let f32 = new Float32Array(m.HEAPU8.buffer, outPtr, n * channels)
 			for (let i = 0, k = 0; i < n; i++) for (let c = 0; c < channels; c++) channelData[c][i] = f32[k++]
 		} else {
-			let div = 2 ** (bits - 1), max = div - 1
+			// 2^-(bits-1), as ffmpeg, libsndfile and the family's encoders: a lossless round trip returns every code
+			let div = 2 ** (bits - 1)
 			let base = outPtr >> 2, k = base
 			let i32 = m.HEAP32
-			for (let i = 0; i < n; i++) for (let c = 0; c < channels; c++) {
-				let v = i32[k++]
-				channelData[c][i] = v < 0 ? v / div : v / max
-			}
+			for (let i = 0; i < n; i++) for (let c = 0; c < channels; c++) channelData[c][i] = i32[k++] / div
 		}
 		return { channelData, sampleRate }
 	}

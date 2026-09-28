@@ -6,6 +6,7 @@
  */
 
 const EMPTY = Object.freeze({ channelData: [], sampleRate: 0 })
+const FORMATS = new Set(['lpcm', 'alaw', 'ulaw', 'ima4'])
 
 // IMA/QuickTime ADPCM tables
 const IMA_STEP = new Int16Array([7,8,9,10,11,12,13,14,16,17,19,21,23,25,28,31,34,37,41,45,50,55,60,66,73,80,88,97,107,118,130,143,157,173,190,209,230,253,279,307,337,371,408,449,494,544,598,658,724,796,876,963,1060,1166,1282,1411,1552,1707,1878,2066,2272,2499,2749,3024,3327,3660,4026,4428,4871,5358,5894,6484,7132,7845,8630,9493,10442,11487,12635,13899,15289,16818,18500,20350,22385,24623,27086,29794,32767])
@@ -76,6 +77,8 @@ function scanCafHdr(buf) {
 				channelsPerFrame: dv.getUint32(off + 24, false),
 				bitsPerChannel: dv.getUint32(off + 28, false),
 			}
+			// compressed formats (aac, alac, ...) carry packets this decoder can't read: say so, don't wait forever
+			if (!FORMATS.has(desc.formatID)) throw Error(`CAF: unsupported format '${desc.formatID}'`)
 		} else if (type === 'data') {
 			if (!desc) return null
 			let dataStart = off + 4 // skip editCount
@@ -88,7 +91,7 @@ function scanCafHdr(buf) {
 			if (formatID === 'alaw' || formatID === 'ulaw') frameBytes = ch
 			else if (formatID === 'ima4') frameBytes = desc.bytesPerPacket || 34 * ch // packet = 34 bytes/channel
 			else frameBytes = ch * bytesPerSample
-			if (!frameBytes) return null
+			if (!frameBytes) throw Error(`CAF: invalid ${formatID} description (${ch} channels, ${bits} bits)`)
 			return { ...desc, dataStart, frameBytes, dataSize }
 		}
 		if (size < 0) break

@@ -157,5 +157,16 @@ console.log('FLAC trailing silence (tiny frames at the end)')
 	ok(n === 18960, 'chunked (777 bytes): every sample: ' + n)
 }
 
+// Every code reads v / 2^(bits-1), as ffmpeg (libswresample) and the family's other decoders and encoders: a
+// lossless round trip returns every code. libFLAC's glue divided by 2^(bits-1) − 1: -32768 read -1.00003.
+{
+	console.log('code values')
+	for (let [bits, codes] of [[16, [0, 1, -1, 100, -100, 16384, -16384, 32767, -32768]], [24, [0, 1, -1, 4194304, -4194304, 8388607, -8388608]]]) {
+		let r = await decode(readFileSync(new URL(`./fixtures/codes${bits}.flac`, import.meta.url)))
+		let want = codes.map(v => Math.fround(v / 2 ** (bits - 1)))
+		ok(r.channelData[0].length === codes.length && want.every((v, i) => r.channelData[0][i] === v), `${bits}-bit: v / 2^${bits - 1}`)
+	}
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail) process.exit(1)

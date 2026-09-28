@@ -238,16 +238,17 @@ function parseStsd(buf, off, end, cb) {
 
 /** Parse the first audio track out of a complete moov. Returns null while moov is incomplete or absent. */
 function parseTrack(buf) {
-	let traks = [], t = null, moov = false, trex = new Map()
+	let traks = [], t = null, moov = false, trex = new Map(), movie = {}
 	walk(buf, 0, buf.length, (type, data, off) => {
 		if (type === 'moov') moov = true
+		else if (type === 'mvhd' || type === 'ilst' && !t) movie[type] = data  // movie timescale; iTunes tags
 		else if (type === 'trak') traks.push(t = { children: {} })
 		else if (type === '/trak') t = null
 		else if (type === 'trex') trex.set(r32(data, 4), { size: r32(data, 16) })
 		else if (!t) return
 		else if (type === 'tkhd') t.id = r32(data, data[0] === 1 ? 20 : 12)
 		else if (type === 'hdlr') t.handler = str4(data, 8)
-		else if (type === 'mdhd') t.timescale = r32(data, data[0] === 1 ? 20 : 12)
+		else if (type === 'mdhd') { t.timescale = r32(data, data[0] === 1 ? 20 : 12); t.children.mdhd = data }
 		else if (type === 'entry') t.entry ??= data
 		else if (type === 'stsz') t.sizes = parseStsz(data)
 		else if (type === 'stco') t.stco = parseStco(data)
@@ -262,6 +263,7 @@ function parseTrack(buf) {
 	if (trex.size && !track.sizes?.length) { track.fragmented = true; track.trex = trex.get(track.id) || {} }
 	else if (!track.sizes || !track.stco?.length) throw Error('Audio track has no sample tables')
 	if (!track.entry.sampleRate && track.timescale) track.entry.sampleRate = track.timescale
+	track.movie = movie
 	return track
 }
 
@@ -316,25 +318,27 @@ const MP3_OTI = new Set([0x69, 0x6B]), AAC_OTI = new Set([0x40, 0x66, 0x67, 0x68
 const UNSUPPORTED = { 0xE1: 'QCELP' }
 const DTS_TYPES = new Set(['dtsc', 'dtsh', 'dtsl', 'dtse']) // DTS-HD variants carry a decodable core
 
-async function createCodec({ entry, children }) {
+async function createCodec({ entry, children, movie }) {
 	let { type } = entry
+	// AAC and ALAC trim the encoder's priming and padding by the track's edit list or iTunSMPB, MP3 by the edit list (gapless)
+	let boxes = { elst: children.elst, mdhd: children.mdhd, stts: children.stts, mvhd: movie?.mvhd, ilst: movie?.ilst ?? children.ilst }
 	if (type === 'mp4a') {
 		let { oti, dsi } = children.esds ? parseEsds(children.esds) : {}
-		if (MP3_OTI.has(oti)) return frames(import('@audio/decode-mp3'))
+		if (MP3_OTI.has(oti)) return mp3(boxes)
 		if (oti === 0xA5) return frames(import('@audio/decode-ac3'))
 		if (oti === 0xA9) return frames(import('@audio/decode-dts'))
 		if (oti === 0xA6) return frames(import('@audio/decode-eac3'))
 		if (!oti || AAC_OTI.has(oti)) {
 			if (!dsi) throw Error('MP4 AAC track has no AudioSpecificConfig')
-			return aac({ asc: dsi })
+			return aac({ asc: dsi }, boxes)
 		}
 		throw unsupported(UNSUPPORTED[oti] || 'esds object type 0x' + oti.toString(16))
 	}
 	if (type === 'alac') {
 		if (!children.alac) throw Error('MP4 ALAC track has no magic cookie')
-		return aac({ alac: children.alac })
+		return aac({ alac: children.alac }, boxes)
 	}
-	if (type === '.mp3') return frames(import('@audio/decode-mp3'))
+	if (type === '.mp3') return mp3(boxes)
 	if (type === 'fLaC') {
 		if (!children.dfLa) throw Error('MP4 FLAC track has no dfLa box')
 		return flac(children.dfLa.subarray(4))
@@ -383,8 +387,9 @@ function pcmFormat(e, ch) {
 
 // --- adapters: { feed(frames: Uint8Array[]), flush(), free() } ---
 
-async function aac(opts) {
-	let dec = await (await import('@audio/decode-aac')).decoder(opts)
+async function aac(opts, boxes) {
+	let { decoder, gapless } = await import('@audio/decode-aac')
+	let dec = await decoder({ ...opts, gapless: gapless?.({ ...boxes, ...opts }) })
 	return { feed: frames => dec.decode(frames), flush: () => dec.flush(), free: () => dec.free() }
 }
 
@@ -392,6 +397,26 @@ async function aac(opts) {
 async function frames(load) {
 	let dec = await (await load).decoder()
 	return { feed: frames => dec.decode(concat(frames)), flush: () => dec.flush?.() ?? EMPTY, free: () => dec.free() }
+}
+
+// MP3 samples carry no LAME tag, so mpg123 decodes from the media's first sample: the edit list's window drops the
+// encoder and decoder delay (1105 for LAME, as ffmpeg writes it) and the padding. decode-aac reads the window.
+async function mp3(boxes) {
+	let [codec, { gapless }] = await Promise.all([frames(import('@audio/decode-mp3')), import('@audio/decode-aac')])
+	let g = gapless?.(boxes)
+	if (!g) return codec
+	let skip = null, left = null
+	return {
+		feed(frames) {
+			let r = codec.feed(frames), n = r.channelData?.[0]?.length
+			if (!n) return r
+			skip ??= Math.round(g.start * r.sampleRate); left ??= g.duration == null ? Infinity : Math.round(g.duration * r.sampleRate)
+			let a = Math.min(n, skip), b = Math.min(n, a + left)
+			skip -= a; left -= b - a
+			return b <= a ? EMPTY : a || b < n ? { ...r, channelData: r.channelData.map(c => c.subarray(a, b)) } : r
+		},
+		flush: codec.flush, free: codec.free
+	}
 }
 
 async function flac(blocks) {
@@ -405,12 +430,17 @@ async function flac(blocks) {
 	}
 }
 
+// Mapping family 1 orders 3–8 channels as Vorbis does (RFC 7845 §5.1.1.2): out in SMPTE/WAV order (L R C LFE Ls Rs …)
+// as decode-opus reorders Ogg Opus: output channel j takes the coded channel of Vorbis position OPUS_ORDER[n][j]
+const OPUS_ORDER = { 3: [0, 2, 1], 5: [0, 2, 1, 3, 4], 6: [0, 2, 1, 5, 3, 4], 7: [0, 2, 1, 6, 5, 3, 4], 8: [0, 2, 1, 7, 5, 6, 3, 4] }
+
 async function opus(dOps) {
 	let channels = dOps[1]
 	let opts = { channels, sampleRate: 48000, preSkip: r16(dOps, 2), outputGain: (r16(dOps, 8) << 16) >> 16 }
 	if (dOps[10] > 0) {
 		opts.streamCount = dOps[11]; opts.coupledStreamCount = dOps[12]
-		opts.channelMappingTable = Array.from(dOps.subarray(13, 13 + channels))
+		let table = Array.from(dOps.subarray(13, 13 + channels))
+		opts.channelMappingTable = dOps[10] === 1 && OPUS_ORDER[channels] ? OPUS_ORDER[channels].map(i => table[i]) : table
 	}
 	let dec = await (await import('@audio/decode-opus/core')).createOpusDecoder()
 	dec.configure(opts)

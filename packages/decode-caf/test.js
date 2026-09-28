@@ -450,6 +450,18 @@ console.log('edge cases')
 	let caf = buildCAF({ sampleRate: 44100, formatID: 'lpcm', formatFlags: 3, bitsPerChannel: 32, channelsPerFrame: 1, samples: [tone440] })
 	r = await decode(caf.buffer)
 	ok(r.channelData.length === 1, 'ArrayBuffer input works')
+
+	// compressed packets (Apple Loops carry AAC or ALAC): an error naming the format, not an empty result
+	for (let formatID of ['aac ', 'alac']) {
+		let c = buildCAF({ sampleRate: 44100, formatID, formatFlags: 0, bitsPerChannel: 0, channelsPerFrame: 2, samples: [[0], [0]] })
+		let msg = ''
+		try { decode(c) } catch (e) { msg = e.message }
+		ok(msg.includes(`'${formatID}'`), `${formatID}: whole-file throws "${msg}"`)
+		d = decoder(); msg = ''
+		try { for (let o = 0; o < c.length; o += 16) d.decode(c.subarray(o, o + 16)) } catch (e) { msg = e.message }
+		ok(msg.includes(`'${formatID}'`), `${formatID}: streamed throws once the description arrives`)
+		d.free()
+	}
 }
 
 // ---- Determinism ----

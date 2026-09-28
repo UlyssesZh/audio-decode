@@ -4,6 +4,7 @@
  */
 import CodecParser, {
 	absoluteGranulePosition,
+	channelMappingFamily,
 	channelMappingTable,
 	channels,
 	codecFrames,
@@ -31,6 +32,12 @@ export default async function decode(src) {
 	} finally { dec.free() }
 }
 
+// Mapping family 1 orders 3–8 channels as Vorbis does (RFC 7845 §5.1.1.2; Vorbis I §4.3.9): FL C FR … LFE last.
+// Output channel j takes the coded channel of Vorbis position ORDER[n][j]: the channels come out in SMPTE/WAV
+// order (L R C LFE Ls Rs …), as the family's other decoders and `audio`'s loudness weights read them (ITU-R BS.1770).
+const ORDER = { 3: [0, 2, 1], 5: [0, 2, 1, 3, 4], 6: [0, 2, 1, 5, 3, 4], 7: [0, 2, 1, 6, 5, 3, 4], 8: [0, 2, 1, 7, 5, 6, 3, 4] }
+const smpte = (family, table) => family === 1 && ORDER[table?.length] ? ORDER[table.length].map(i => table[i]) : table
+
 export async function decoder() {
 	let core = await createOpusDecoder()
 	let pages = oggPages()
@@ -38,12 +45,12 @@ export async function decoder() {
 		onCodec: codec => { if (codec !== 'opus') throw Error('@audio/decode-opus does not support this codec ' + codec) },
 		enableFrameCRC32: false
 	})
-	let configured = false, total = 0, base = 0, ended = false, freed = false
+	let configured = false, total = 0, base = 0, skip = 0, ended = false, freed = false
 
 	let decodePages = pages => {
 		let results = []
 		for (let page of pages) {
-			let frames = page[codecFrames]
+			let frames = page[codecFrames], first = frames.length && !configured
 			if (frames.length) {
 				if (!configured) {
 					let info = frames[0][header]
@@ -52,12 +59,13 @@ export async function decoder() {
 						channels: info[channels],
 						streamCount: info[streamCount],
 						coupledStreamCount: info[coupledStreamCount],
-						channelMappingTable: info[channelMappingTable],
+						channelMappingTable: smpte(info[channelMappingFamily], info[channelMappingTable]),
 						preSkip: info[preSkip],
 						outputGain: info[outputGain]
 					})
 					configured = true
 					total = 0
+					skip = info[preSkip]
 				}
 
 				let decoded = core.decodeFrames(frames.map(frame => frame[data]))
@@ -67,8 +75,10 @@ export async function decoder() {
 
 			if (page[isLastPage]) {
 				if (page[absoluteGranulePosition] !== undefined && results.length) {
-					// codec-parser counts samples across chained streams: this stream's own count starts at `base`
-					let trim = total - (page[totalSamples] - base)
+					// codec-parser counts samples across chained streams: this stream's own count starts at `base`.
+					// A stream of one audio page has no earlier granule to count from (codec-parser's count keeps the
+					// pre-skip): it ends at its granule less the pre-skip (RFC 7845 §4.4–4.5).
+					let trim = total - (first ? Number(page[absoluteGranulePosition]) - skip : page[totalSamples] - base)
 					if (trim > 0) {
 						let decoded = results[results.length - 1]
 						let keep = Math.max(0, decoded.samplesDecoded - trim)

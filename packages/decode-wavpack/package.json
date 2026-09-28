@@ -1,6 +1,6 @@
 {
   "name": "@audio/decode-wavpack",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Decode WavPack (.wv) audio with libwavpack WASM",
   "type": "module",
   "main": "decode-wavpack.js",

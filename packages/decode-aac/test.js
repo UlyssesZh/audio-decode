@@ -1,5 +1,5 @@
 import { readFileSync } from 'fs'
-import decode, { decoder } from './decode-aac.js'
+import decode, { decoder, gapless } from './decode-aac.js'
 import { parseMeta } from './meta.js'
 
 let pass = 0, fail = 0
@@ -330,6 +330,58 @@ console.log('M4A metadata')
 	ok(meta.track === '3', 'track (trkn)')
 	ok(meta.pictures.length === 1 && meta.pictures[0].mime === 'image/png', 'cover art (covr)')
 	ok(parseMeta(new Uint8Array([0, 0, 0, 8, 1, 2, 3, 4])) === null, 'non-MP4 → null')
+}
+
+// ---- gapless: iTunSMPB (Apple's afconvert) ----
+// A 44137-sample chirp (100 Hz up 1950 Hz/s, 0.4 peak) through AudioToolbox AAC-LC: 2112 samples of priming, 855
+// of padding, per its iTunSMPB. FAAD2 withholds 1024; the rest is trimmed, so the output is the source's length,
+// on its first sample. Before, it came 1088 samples late and 2048 longer.
+console.log('gapless')
+{
+	let src = Float32Array.from({ length: 44137 }, (_, i) => { let t = i / 44100; return 0.4 * Math.sin(2 * Math.PI * (100 * t + 1950 * t * t)) })
+	let fx = readFileSync(new URL('./fixtures/gapless-itunsmpb.m4a', import.meta.url))
+	for (let [name, r] of [['whole', await decode(fx)], ['chunked', await (async () => {
+		let dec = await decoder(), parts = []
+		for (let i = 0; i < fx.length; i += 1000) { let c = dec.decode(fx.subarray(i, i + 1000)); if (c.channelData.length) parts.push(c.channelData[0]) }
+		dec.free()
+		let out = new Float32Array(parts.reduce((n, p) => n + p.length, 0)), o = 0
+		for (let p of parts) { out.set(p, o); o += p.length }
+		return { channelData: [out] }
+	})()]]) {
+		let out = r.channelData[0], best = -Infinity, lag = 0
+		for (let d = -2500; d <= 2500; d++) { let s = 0; for (let i = 5000; i < 35000; i++) s += src[i] * (out[i + d] || 0); if (s > best) best = s, lag = d }
+		ok(out.length === src.length, `${name}: length ${out.length} = ${src.length}`)
+		ok(lag === 0, `${name}: no lag (${lag})`)
+	}
+}
+
+// ---- gapless: the edit list's one media edit (ISO/IEC 14496-12 §8.6.6) ----
+// An empty edit (media_time -1, a delay) beside it keeps its window; several media edits cut or repeat the media,
+// which no trim presents: no window, the track decodes whole
+console.log('gapless edit list')
+{
+	let box = (n, f) => { let b = new Uint8Array(n); f(new DataView(b.buffer)); return b }
+	let elst = (...e) => box(8 + 12 * e.length, v => { v.setUint32(4, e.length); e.forEach(([d, m], i) => { v.setUint32(8 + 12 * i, d); v.setInt32(12 + 12 * i, m); v.setUint32(16 + 12 * i, 0x10000) }) })
+	let mdhd = box(24, v => v.setUint32(12, 44100)), mvhd = box(24, v => v.setUint32(12, 1000))
+	ok(gapless({ elst: elst([1000, 2112]), mdhd, mvhd })?.start === 2112 / 44100, 'one media edit: its window')
+	ok(gapless({ elst: elst([500, -1], [1000, 2112]), mdhd, mvhd })?.start === 2112 / 44100, 'an empty edit, then the media edit: its window')
+	ok(gapless({ elst: elst([500, 2112], [500, 30000]), mdhd, mvhd }) === null, 'two media edits: no window')
+}
+
+// ---- ADTS channel order ----
+// 3.0 tones (L 220, R 330, C 440 Hz) through ffmpeg's AAC: channel configuration 3 codes C L R, out in SMPTE order.
+// A 0xFF inside a leading ID3v2 tag is no ADTS header: the configuration comes from the first verified sync.
+//   ffmpeg -f lavfi -i "aevalsrc=0.3*sin(2*PI*220*t)|0.3*sin(2*PI*330*t)|0.3*sin(2*PI*440*t):s=48000:d=0.2:c=3.0" \
+//          -c:a aac -b:a 64k -fflags +bitexact -flags +bitexact -f adts tones-3ch.aac
+console.log('ADTS channel order')
+{
+	let adts = readFileSync(new URL('./fixtures/tones-3ch.aac', import.meta.url))
+	let id3 = Uint8Array.from([0x49, 0x44, 0x33, 3, 0, 0, 0, 0, 0, 16, 0x54, 0x58, 0x58, 0x58, 0, 0, 0, 6, 0, 0, 0, 0xFF, 0, 0, 0, 0])
+	let mag = (d, f, sr) => { let re = 0, im = 0; for (let i = 0; i < d.length; i++) { let p = 2 * Math.PI * f * i / sr; re += d[i] * Math.cos(p); im -= d[i] * Math.sin(p) } return Math.hypot(re, im) / d.length }
+	for (let [name, buf] of [['ADTS', adts], ['ID3 + ADTS', Buffer.concat([id3, adts])]]) {
+		let r = await decode(buf), tones = r.channelData.map(d => [220, 330, 440].sort((a, b) => mag(d, b, r.sampleRate) - mag(d, a, r.sampleRate))[0])
+		ok(tones.join() === '220,330,440', `${name}: L R C (${tones})`)
+	}
 }
 
 console.log(`\n${pass + fail} tests, ${pass} passed, ${fail} failed`)

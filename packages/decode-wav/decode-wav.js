@@ -141,9 +141,9 @@ function decodeRaw(raw, hdr) {
 	let n = frames * nCh, p = 0
 	let isFloat = codec === 'float'
 	// Samples de-interleave channel by channel (sample i of channel c is element i·nCh + c).
-	// Integer PCM scales asymmetrically: negatives by 2^-(bits-1), positives by 1/(2^(bits-1) − 1).
-	// 8/16-bit read every code's value from a table. 24-bit multiplies by the reciprocal, which
-	// rounds to the same float32 as dividing (checked exhaustively); 32-bit keeps the division.
+	// Integer PCM scales by 2^-(bits-1) (ffmpeg, libsndfile, Web Audio): exact in float32, every
+	// encoder of the family writes round(x · 2^(bits-1)) back, so a lossless round trip is the
+	// identity. 8/16-bit read every code's value from a table.
 	if (codec === 'alaw' || codec === 'ulaw') {
 		let tbl = codec === 'alaw' ? ALAW_TBL : ULAW_TBL
 		for (let i = 0; i < frames; i++) for (let c = 0; c < nCh; c++) ch[c][i] = tbl[raw[p++]] / 32768
@@ -151,20 +151,19 @@ function decodeRaw(raw, hdr) {
 		let s = samples(raw, bitDepth === 64 ? Float64Array : Float32Array, n)
 		for (let c = 0; c < nCh; c++) for (let x = ch[c], i = 0, k = c; i < frames; i++, k += nCh) x[i] = s[k]
 	} else if (bitDepth === 8) {
-		let t = U8_TBL ??= scale(256, u => u - 128, 128, 127)
+		let t = U8_TBL ??= scale(256, u => u - 128, 128)
 		for (let c = 0; c < nCh; c++) for (let x = ch[c], i = 0, k = c; i < frames; i++, k += nCh) x[i] = t[raw[k]]
 	} else if (bitDepth === 16) {
-		let s = samples(raw, Uint16Array, n), t = S16_TBL ??= scale(65536, u => u << 16 >> 16, 32768, 32767)
+		let s = samples(raw, Uint16Array, n), t = S16_TBL ??= scale(65536, u => u << 16 >> 16, 32768)
 		for (let c = 0; c < nCh; c++) for (let x = ch[c], i = 0, k = c; i < frames; i++, k += nCh) x[i] = t[s[k]]
 	} else if (bitDepth === 24) {
 		for (let c = 0; c < nCh; c++) for (let x = ch[c], i = 0, k = c * 3; i < frames; i++, k += nCh * 3) {
-			let v = (raw[k] | raw[k + 1] << 8 | raw[k + 2] << 16) << 8 >> 8
-			x[i] = v * (v < 0 ? 1 / 8388608 : 1 / 8388607)
+			x[i] = ((raw[k] | raw[k + 1] << 8 | raw[k + 2] << 16) << 8 >> 8) / 8388608
 		}
 	} else if (bitDepth === 32) {
 		let s = samples(raw, Int32Array, n)
 		for (let c = 0; c < nCh; c++) for (let x = ch[c], i = 0, k = c; i < frames; i++, k += nCh) {
-			let v = s[k]; x[i] = v < 0 ? v / 2147483648 : v / 2147483647
+			x[i] = s[k] / 2147483648
 		}
 	} else { throw TypeError('Unsupported WAV bit depth: ' + bitDepth) }
 	return { channelData: ch, sampleRate }
@@ -172,9 +171,9 @@ function decodeRaw(raw, hdr) {
 
 // Sample value of every 8/16-bit code, built on first use
 let U8_TBL = null, S16_TBL = null
-function scale(n, signed, neg, pos) {
+function scale(n, signed, full) {
 	let t = new Float32Array(n)
-	for (let u = 0; u < n; u++) { let v = signed(u); t[u] = v < 0 ? v / neg : v / pos }
+	for (let u = 0; u < n; u++) t[u] = signed(u) / full
 	return t
 }
 

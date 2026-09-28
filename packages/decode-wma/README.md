@@ -1,6 +1,6 @@
 # @audio/decode-wma
 
-Decode WMA audio to PCM float samples. The package combines a pure-JS ASF demuxer with the [RockBox](https://www.rockbox.org/) fixed-point decoder compiled to WASM.
+Decode WMA audio to PCM float samples. The package combines a pure-JS ASF demuxer with FFmpeg's WMA decoders (`wmav1`, `wmav2`, `wmapro`, `wmalossless`), a slim LGPL-2.1-or-later `libavcodec` build compiled to WASM. Output matches FFmpeg's to float precision.
 
 ## Install
 
@@ -58,8 +58,8 @@ Parse ASF container without decoding. Returns stream properties and raw packets.
 
 - WMA v1 (0x0160)
 - WMA v2 (0x0161)
-
-WMA Pro and Lossless are not supported. An FFmpeg-based build is available via `build-ffmpeg.sh` for those formats.
+- WMA Pro (0x0162)
+- WMA Lossless (0x0163)
 
 ## Building WASM
 
@@ -67,8 +67,8 @@ WMA Pro and Lossless are not supported. An FFmpeg-based build is available via `
 npm run build
 ```
 
-RockBox source is included in `lib/rockbox-wma/` (3 files, 152 KB).
+`build.sh` configures FFmpeg from the shared [`lib/ffmpeg`](../../lib/ffmpeg) submodule (`release/7.1`, as [`@audio/decode-eac3`](../decode-eac3) and [`@audio/decode-ape`](../decode-ape)) with only the four WMA decoders, and links the glue in `src/wma_glue.c`.
 
 ## License
 
-[ॐ](https://github.com/krishnized/license/) · [GPL-2.0+](./LICENSE) (RockBox)
+[ॐ](https://github.com/krishnized/license/) · [LGPL-2.1-or-later](./LICENSE), inherited from the bundled [FFmpeg](https://ffmpeg.org/legal.html) WMA decoders (FFmpeg `release/7.1` at commit [`3978a28`](https://github.com/FFmpeg/FFmpeg/commit/3978a28d5bdded4ce7eff2535c920326b5c8f2fc), built without `--enable-gpl`; see [`build.sh`](./build.sh) and [`LICENSE.ffmpeg`](./LICENSE.ffmpeg)). Corresponding source: that FFmpeg commit, with [`build.sh`](./build.sh) and [`src/wma_glue.c`](./src/wma_glue.c).

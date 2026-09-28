@@ -360,7 +360,7 @@ t('worklet WASM loaders are static ES modules', async () => {
 		let source = String(await readFile(new URL(`./packages/decode-${name}/src/${name}.wasm.js`, import.meta.url)))
 		is(source.includes('ENVIRONMENT_IS_AUDIO_WORKLET'), true, name + ' worklet target')
 	}
-	for (let path of ['decode-opus/build.sh', 'decode-aac/build.sh', 'decode-amr/build.sh', 'decode-wma/build.sh', 'decode-wma/build-ffmpeg.sh']) {
+	for (let path of ['decode-opus/build.sh', 'decode-aac/build.sh', 'decode-amr/build.sh', 'decode-wma/build.sh']) {
 		let source = String(await readFile(new URL('./packages/' + path, import.meta.url)))
 		let staticWorklet = !source.includes('.cjs') && source.includes('-s EXPORT_ES6=1') &&
 			source.includes("-s ENVIRONMENT='web,worklet,shell'") && source.includes('-s SINGLE_FILE=1')

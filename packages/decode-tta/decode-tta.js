@@ -138,10 +138,9 @@ function decodeValue(br, ch, predShift) {
 	return value
 }
 
+// 2^-(bits-1), as ffmpeg, libsndfile and the family's encoders: a lossless round trip is the identity
 function scale(v, byteSize) {
-	if (byteSize === 1) return v < 0 ? v / 128 : v / 127
-	if (byteSize === 2) return v < 0 ? v / 32768 : v / 32767
-	return v < 0 ? v / 8388608 : v / 8388607 // 24-bit
+	return v / (byteSize === 1 ? 128 : byteSize === 2 ? 32768 : 8388608)
 }
 
 // decode exactly one frame's payload (including its trailing 4-byte CRC32); null on CRC fail

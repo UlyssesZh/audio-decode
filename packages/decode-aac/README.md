@@ -54,6 +54,16 @@ let dec = await decoder({ alac })  // ALAC magic cookie
 
 This is how [@audio/decode-mp4](../decode-mp4), [@audio/decode-webm](../decode-webm) and [@audio/decode-avi](../decode-avi) decode AAC and ALAC tracks from video files.
 
+### Gapless
+
+An M4A is decoded gapless: the encoder's priming (Apple's encoders: 2112 samples) and padding are trimmed, so the output has the source's length and timing. The track's edit list says where the presentation starts when it has one media edit ([ISO/IEC 14496-12](https://www.iso.org/standard/83102.html) §8.6.6; several are an edit, not a trim: the track decodes whole), else iTunes' `iTunSMPB` tag; FAAD2's own delay (it withholds its first frame; SBR delays HE-AAC 962 samples more) is accounted for. A raw ADTS stream carries no such information and keeps the decoder's delay. A demuxer passes the window it read from its container:
+
+```js
+import { decoder, gapless } from '@audio/decode-aac'
+let dec = await decoder({ asc, gapless: gapless({ elst, mdhd, stts, mvhd, ilst, asc }) })  // box bodies
+// or directly: { gapless: { start, duration } } in seconds of the media timeline
+```
+
 ### `AudioData`
 
 ```ts

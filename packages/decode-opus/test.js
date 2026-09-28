@@ -112,10 +112,14 @@ console.log('Opus surround')
 	let result = await decode(source)
 	ok(result.channelData.length === 6, '5.1 channels')
 	ok(result.channelData.every(channel => channel.length > 0), 'all channels decoded')
+	// its only audio page is the EOS page: granule 9912 less pre-skip 312 (ffmpeg decodes 9600)
+	ok(result.channelData[0].length === 9600, 'one-page stream ends at its granule less the pre-skip')
 	ok(result.channelData.every(channel => channel.every(Number.isFinite)), 'finite samples')
-	let tones = [220, 440, 330, 660, 770]
-	ok(tones.every((frequency, channel) => toneMagnitude(result.channelData[channel], frequency, result.sampleRate) > 0.04), '5.1 channel mapping order')
-	ok(rms(result.channelData[5]) < 0.01, 'LFE remains in the sixth channel')
+	// coded in Vorbis order (FL 220, C 440, FR 330, RL 660, RR 770, LFE), out in SMPTE/WAV order: L R C LFE Ls Rs,
+	// as the family's other decoders and ITU-R BS.1770's weights read them
+	let tones = { 0: 220, 1: 330, 2: 440, 4: 660, 5: 770 }
+	ok(Object.entries(tones).every(([channel, frequency]) => toneMagnitude(result.channelData[channel], frequency, result.sampleRate) > 0.04), '5.1 in SMPTE order')
+	ok(rms(result.channelData[3]) < 0.01, 'LFE in the fourth channel')
 }
 
 console.log('Opus concurrent')

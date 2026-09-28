@@ -242,6 +242,23 @@ if (existsSync(lenaPath)) {
 	console.log('SKIP: WASM decode (no lena.wma)')
 }
 
+// --- WASM decode against the signal: the stereo fixture is ffmpeg's 1 s 440 Hz sine, wmav2 128 kbps ---
+// RockBox's fixed-point decoder (the former engine) returned one channel of noise for it; FFmpeg's decoder
+// returns both channels of the sine.
+
+if (hasStereo) {
+	console.log('WASM decode: stereo sine')
+	let r = await decode(new Uint8Array(readFileSync(stereoPath)))
+	ok(r.channelData.length === 2, 'stereo: ' + r.channelData.length + ' channels')
+	for (let [c, x] of r.channelData.entries()) {
+		// the sine's level at 440 Hz against everything else, over the middle of the file (Hann-windowed DFT)
+		let n = 16384, s0 = (x.length - n) >> 1, tone = 0, all = 0, re = 0, im = 0
+		for (let i = 0; i < n; i++) { let w = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / n), v = x[s0 + i] * w; re += v * Math.cos(2 * Math.PI * 440 * i / r.sampleRate); im += v * Math.sin(2 * Math.PI * 440 * i / r.sampleRate); all += v * v }
+		tone = 3 * (re * re + im * im) / n  // a Hann-windowed sinusoid's energy from its DFT peak: |X|² = (A n/4)², Σ(xw)² = 3A²n/16
+		ok(tone / all > 0.99, `ch${c}: the 440 Hz sine holds ${(100 * tone / all).toFixed(1)} % of the energy`)
+	}
+}
+
 // --- Summary ---
 
 console.log(`\n${pass} passed, ${fail} failed`)

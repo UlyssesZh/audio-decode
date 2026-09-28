@@ -1,13 +1,18 @@
 /**
- * RockBox fixed-point WMA WASM glue — bridge between JS and standalone wmadeci.
+ * WMA WASM glue: bridge between JS and FFmpeg's libavcodec WMA decoders (LGPL-2.1-or-later)
  *
- * Exposes create/decode/close for WMA v1/v2 (no Pro/Lossless).
- * Uses RockBox's fixed-point decoder from lib/rockbox-wma/.
+ * Exposes create/decode/close for WMA v1/v2/Pro/Lossless; build.sh links the slim libavcodec.
+ * Public API only: avcodec_find_decoder / avcodec_open2 / avcodec_send_packet / avcodec_receive_frame.
  */
 
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
+
+#include "libavcodec/avcodec.h"
+#include "libavutil/opt.h"
+#include "libavutil/mem.h"
+#include "libavutil/channel_layout.h"
+#include "libavutil/error.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
@@ -15,26 +20,12 @@
 #else
 #define EXPORT
 #endif
-
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
-
-#ifdef __EMSCRIPTEN__
-#include <emscripten/emscripten.h>
-#define EXPORT EMSCRIPTEN_KEEPALIVE
-#else
-#define EXPORT
-#endif
-
-/* Pull in the decoder — it's a single-file implementation.
-   wmadeci.c typedefs are patched out by build.sh (conflict with stdint.h). */
-#include "_wmadeci_patched.c"
 
 typedef struct {
-    CodecContext ctx;
-    AVCodec *codec;
-    WMADecodeContext wma;
+    const AVCodec *codec;
+    AVCodecContext *ctx;
+    AVPacket *pkt;
+    AVFrame *frame;
 } WMAHandle;
 
 static float *out_buf = NULL;
@@ -43,45 +34,60 @@ static int out_samples = 0;
 static int out_channels = 0;
 static int out_samplerate = 0;
 
+static enum AVCodecID tag_to_id(int tag) {
+    switch (tag) {
+        case 0x0160: return AV_CODEC_ID_WMAV1;
+        case 0x0161: return AV_CODEC_ID_WMAV2;
+        case 0x0162: return AV_CODEC_ID_WMAPRO;
+        case 0x0163: return AV_CODEC_ID_WMALOSSLESS;
+        default:     return AV_CODEC_ID_NONE;
+    }
+}
+
 EXPORT void *wma_create(int channels, int sample_rate, int bit_rate,
                          int block_align, int format_tag, int bits_per_sample,
                          unsigned char *extra, int extra_len) {
-    AVCodec *codec = NULL;
+    av_log_set_level(AV_LOG_QUIET); /* a damaged packet is an expected, handled case here */
+    enum AVCodecID id = tag_to_id(format_tag);
+    if (id == AV_CODEC_ID_NONE) return NULL;
 
-    /* Only WMAv1 (0x0160) and WMAv2 (0x0161) supported by RockBox decoder */
-    if (format_tag == 0x0160) {
-        codec = &wmav1i_decoder;
-    } else if (format_tag == 0x0161) {
-        codec = &wmav2i_decoder;
-    } else {
-        return NULL;
-    }
+    const AVCodec *codec = avcodec_find_decoder(id);
+    if (!codec) return NULL;
 
-    WMAHandle *h = (WMAHandle *)calloc(1, sizeof(WMAHandle));
-    if (!h) return NULL;
+    AVCodecContext *ctx = avcodec_alloc_context3(codec);
+    if (!ctx) return NULL;
 
-    h->codec = codec;
-    h->ctx.codec = codec;
-    h->ctx.codec_id = codec->id;
-    h->ctx.codec_type = CODEC_TYPE_AUDIO;
-    h->ctx.channels = channels;
-    h->ctx.sample_rate = sample_rate;
-    h->ctx.bit_rate = bit_rate;
-    h->ctx.block_align = block_align;
-    h->ctx.bits_per_sample = bits_per_sample;
-    h->ctx.priv_data = &h->wma;
+    av_channel_layout_default(&ctx->ch_layout, channels);
+    ctx->sample_rate = sample_rate;
+    ctx->bit_rate = bit_rate;
+    ctx->block_align = block_align;
+    ctx->bits_per_coded_sample = bits_per_sample;
 
     if (extra && extra_len > 0) {
-        h->ctx.extradata = malloc(extra_len);
-        if (h->ctx.extradata) {
-            memcpy(h->ctx.extradata, extra, extra_len);
-            h->ctx.extradata_size = extra_len;
+        ctx->extradata = av_mallocz(extra_len + AV_INPUT_BUFFER_PADDING_SIZE);
+        if (ctx->extradata) {
+            memcpy(ctx->extradata, extra, extra_len);
+            ctx->extradata_size = extra_len;
         }
     }
 
-    /* Initialize decoder */
-    if (codec->init(&h->ctx) < 0) {
-        free(h->ctx.extradata);
+    if (avcodec_open2(ctx, codec, NULL) < 0) {
+        avcodec_free_context(&ctx);
+        return NULL;
+    }
+
+    WMAHandle *h = (WMAHandle *)malloc(sizeof(WMAHandle));
+    if (!h) { avcodec_free_context(&ctx); return NULL; }
+
+    h->codec = codec;
+    h->ctx = ctx;
+    h->pkt = av_packet_alloc();
+    h->frame = av_frame_alloc();
+
+    if (!h->pkt || !h->frame) {
+        if (h->pkt) av_packet_free(&h->pkt);
+        if (h->frame) av_frame_free(&h->frame);
+        avcodec_free_context(&ctx);
         free(h);
         return NULL;
     }
@@ -89,47 +95,95 @@ EXPORT void *wma_create(int channels, int sample_rate, int bit_rate,
     return h;
 }
 
+static void collect_frames(WMAHandle *h, float **tmp, int *tmp_cap, int *total) {
+    int ret;
+    while (1) {
+        ret = avcodec_receive_frame(h->ctx, h->frame);
+        if (ret != 0) break;
+
+        int ch = h->frame->ch_layout.nb_channels;
+        if (!ch) ch = h->ctx->ch_layout.nb_channels;
+        int nb = h->frame->nb_samples;
+        int n = ch * nb;
+        int needed = *total + n;
+
+        if (needed > *tmp_cap) {
+            *tmp_cap = needed + 4096;
+            *tmp = (float *)realloc(*tmp, *tmp_cap * sizeof(float));
+        }
+
+        out_channels = ch;
+        out_samplerate = h->frame->sample_rate ? h->frame->sample_rate : h->ctx->sample_rate;
+
+        /* Convert to interleaved float */
+        enum AVSampleFormat fmt = h->frame->format;
+        for (int s = 0; s < nb; s++) {
+            for (int c = 0; c < ch; c++) {
+                float val = 0.0f;
+                if (fmt == AV_SAMPLE_FMT_FLTP) {
+                    val = ((float *)h->frame->data[c])[s];
+                } else if (fmt == AV_SAMPLE_FMT_FLT) {
+                    val = ((float *)h->frame->data[0])[s * ch + c];
+                } else if (fmt == AV_SAMPLE_FMT_S16P) {
+                    val = ((int16_t *)h->frame->data[c])[s] / 32768.0f;
+                } else if (fmt == AV_SAMPLE_FMT_S16) {
+                    val = ((int16_t *)h->frame->data[0])[s * ch + c] / 32768.0f;
+                } else if (fmt == AV_SAMPLE_FMT_S32P) {
+                    val = ((int32_t *)h->frame->data[c])[s] / 2147483648.0f;
+                } else if (fmt == AV_SAMPLE_FMT_S32) {
+                    val = ((int32_t *)h->frame->data[0])[s * ch + c] / 2147483648.0f;
+                }
+                (*tmp)[(*total)++] = val;
+            }
+        }
+
+        av_frame_unref(h->frame);
+    }
+}
+
+/* buf NULL drains: the decoder holds the last frame's overlap until the end (wmadec's flush frame) */
 EXPORT float *wma_decode(void *handle, unsigned char *buf, int len) {
     WMAHandle *h = (WMAHandle *)handle;
-    if (!h) return NULL;
+    if (!h || !h->ctx) return NULL;
 
     out_samples = 0;
-    out_channels = h->ctx.channels;
-    out_samplerate = h->ctx.sample_rate;
+    out_channels = h->ctx->ch_layout.nb_channels;
+    out_samplerate = h->ctx->sample_rate;
 
-    /* Allocate sample buffer for one superframe decode.
-     * Max frame_len is 2048, max channels is 2, output is interleaved int16_t.
-     * We allocate conservatively. */
-    int max_samples = 2048 * 2 * 4; /* generous: multiple frames in superframe */
-    int16_t *pcm = (int16_t *)calloc(max_samples, sizeof(int16_t));
-    if (!pcm) return NULL;
-
-    int data_size = 0;
-    int ret = h->codec->decode(&h->ctx, pcm, &data_size, buf, len);
-
-    if (ret < 0 || data_size <= 0) {
-        free(pcm);
-        return NULL;
+    /* a padded copy: libavcodec's bit readers may read AV_INPUT_BUFFER_PADDING_SIZE past the data */
+    av_packet_unref(h->pkt);
+    if (buf) {
+        if (av_new_packet(h->pkt, len) < 0) return NULL;
+        memcpy(h->pkt->data, buf, len);
     }
 
-    /* data_size is in bytes; convert to sample count */
-    int total_int16 = data_size / sizeof(int16_t);
-    /* total_int16 is interleaved: ch0, ch1, ch0, ch1, ... */
-    int total_float = total_int16;
+    int total = 0;
+    float *tmp = NULL;
+    int tmp_cap = 0;
 
-    if (total_float > out_cap) {
+    /* Send packet, handling EAGAIN by draining first */
+    int ret = avcodec_send_packet(h->ctx, buf ? h->pkt : NULL);
+    if (ret == AVERROR(EAGAIN)) {
+        collect_frames(h, &tmp, &tmp_cap, &total);
+        ret = avcodec_send_packet(h->ctx, h->pkt);
+    }
+    if (ret < 0 && ret != AVERROR_EOF) { free(tmp); return NULL; }
+
+    /* Collect all output frames */
+    collect_frames(h, &tmp, &tmp_cap, &total);
+
+    if (!total) { free(tmp); return NULL; }
+
+    /* Copy to persistent output buffer */
+    if (total > out_cap) {
         free(out_buf);
-        out_cap = total_float;
-        out_buf = (float *)malloc(total_float * sizeof(float));
+        out_cap = total;
+        out_buf = (float *)malloc(total * sizeof(float));
     }
+    memcpy(out_buf, tmp, total * sizeof(float));
+    free(tmp);
+    out_samples = total;
 
-    /* Convert int16 interleaved -> float interleaved */
-    for (int i = 0; i < total_float; i++) {
-        out_buf[i] = pcm[i] / 32768.0f;
-    }
-
-    free(pcm);
-    out_samples = total_float;
     return out_buf;
 }
 
@@ -140,10 +194,9 @@ EXPORT int wma_samplerate(void) { return out_samplerate; }
 EXPORT void wma_close(void *handle) {
     WMAHandle *h = (WMAHandle *)handle;
     if (!h) return;
-    if (h->codec && h->codec->close) {
-        h->codec->close(&h->ctx);
-    }
-    free(h->ctx.extradata);
+    if (h->frame) av_frame_free(&h->frame);
+    if (h->pkt) av_packet_free(&h->pkt);
+    if (h->ctx) avcodec_free_context(&h->ctx);
     free(h);
 }
 

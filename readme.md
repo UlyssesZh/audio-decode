@@ -35,7 +35,7 @@ const { channelData, sampleRate } = await decode(anyAudioBuffer);
 | E-AC-3 (Dolby Digital Plus, + AC-3) | [@audio/decode-eac3](./packages/decode-eac3) | 432 KB | WASM (FFmpeg libavcodec, LGPL) |
 | APE (Monkey's Audio) | [@audio/decode-ape](./packages/decode-ape) | 262 KB | WASM (FFmpeg libavcodec, LGPL) |
 | AMR | [@audio/decode-amr](./packages/decode-amr) | 241 KB | WASM |
-| WMA | [@audio/decode-wma](./packages/decode-wma) | 91 KB | WASM |
+| WMA (v1, v2, Pro, Lossless) | [@audio/decode-wma](./packages/decode-wma) | 463 KB | WASM (FFmpeg libavcodec, LGPL) |
 | WavPack | [@audio/decode-wavpack](./packages/decode-wavpack) | 51 KB | WASM |
 | TTA (True Audio) | [@audio/decode-tta](./packages/decode-tta) | 11 KB | JS |
 | Musepack SV7 / SV8 | [@audio/decode-mpc](./packages/decode-mpc) | 51 KB | WASM |
@@ -187,6 +187,6 @@ worker.onmessage = ({ data }) => { /* { channelData, sampleRate } */ }
 
 ## Licensing
 
-The umbrella and most codec packages are MIT. Codecs built on other libraries carry that library's license: <a href="./packages/decode-aac">@audio/decode-aac</a> GPL-2.0; <a href="./packages/decode-wma">@audio/decode-wma</a>, <a href="./packages/decode-ac3">@audio/decode-ac3</a> and <a href="./packages/decode-dts">@audio/decode-dts</a> GPL-2.0-or-later; <a href="./packages/decode-ape">@audio/decode-ape</a> and <a href="./packages/decode-eac3">@audio/decode-eac3</a> LGPL-2.1-or-later (a slim FFmpeg libavcodec build, no GPL components); <a href="./packages/decode-wavpack">@audio/decode-wavpack</a>, <a href="./packages/decode-mpc">@audio/decode-mpc</a> and <a href="./packages/decode-mod">@audio/decode-mod</a> BSD-3-Clause; <a href="./packages/decode-amr">@audio/decode-amr</a> Apache-2.0. Install only the codecs whose licenses fit your project. The umbrella loads them on demand.
+The umbrella and most codec packages are MIT. Codecs built on other libraries carry that library's license: <a href="./packages/decode-aac">@audio/decode-aac</a> GPL-2.0; <a href="./packages/decode-ac3">@audio/decode-ac3</a> and <a href="./packages/decode-dts">@audio/decode-dts</a> GPL-2.0-or-later; <a href="./packages/decode-ape">@audio/decode-ape</a>, <a href="./packages/decode-eac3">@audio/decode-eac3</a> and <a href="./packages/decode-wma">@audio/decode-wma</a> LGPL-2.1-or-later (a slim FFmpeg libavcodec build, no GPL components); <a href="./packages/decode-wavpack">@audio/decode-wavpack</a>, <a href="./packages/decode-mpc">@audio/decode-mpc</a> and <a href="./packages/decode-mod">@audio/decode-mod</a> BSD-3-Clause; <a href="./packages/decode-amr">@audio/decode-amr</a> Apache-2.0. Install only the codecs whose licenses fit your project. The umbrella loads them on demand.
 
 <p align="center"><a href="https://github.com/krishnized/license/">ॐ</a> · <a href="./LICENSE">MIT</a>

@@ -43,6 +43,8 @@ Create a decoder instance.
 - `ulaw`: G.711 µ-law.
 - `ima4`: IMA/QuickTime ADPCM.
 
+Other formats (AAC and ALAC packets, as in Apple Loops) throw `CAF: unsupported format '<id>'`.
+
 ## License
 
 [ॐ](https://github.com/krishnized/license/) · [MIT](./LICENSE)

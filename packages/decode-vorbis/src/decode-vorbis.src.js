@@ -9,6 +9,11 @@ import { oggPages } from '../../_build/ogg.js'
 
 const EMPTY = Object.freeze({ channelData: Object.freeze([]), sampleRate: 0 })
 
+// Vorbis orders 3–8 channels FL C FR … LFE last (Vorbis I §4.3.9): output channel j is Vorbis channel ORDER[n][j],
+// so the channels come out in SMPTE/WAV order (L R C LFE Ls Rs …), as the family's other decoders and `audio`'s
+// loudness weights read them (ITU-R BS.1770)
+const ORDER = { 3: [0, 2, 1], 5: [0, 2, 1, 3, 4], 6: [0, 2, 1, 5, 3, 4], 7: [0, 2, 1, 6, 5, 3, 4], 8: [0, 2, 1, 7, 5, 6, 3, 4] }
+
 export default async function decode(src) {
 	let buf = src instanceof Uint8Array ? src : new Uint8Array(src)
 	let dec = await decoder()
@@ -80,6 +85,8 @@ export async function decoder() {
 		// channel and sample-rate output pointers.
 		if (!packets.length) return null
 		let decoded = codec.decodePackets(packets)
+		let order = ORDER[decoded.channelData.length]
+		if (order) decoded.channelData = order.map(i => decoded.channelData[i])
 		total += decoded.samplesDecoded
 		let page = pages[pages.length - 1]
 		if (page?.[isLastPage]) {

@@ -2858,6 +2858,7 @@ function concat(a, b) {
 
 // src/decode-vorbis.src.js
 var EMPTY = Object.freeze({ channelData: Object.freeze([]), sampleRate: 0 });
+var ORDER = { 3: [0, 2, 1], 5: [0, 2, 1, 3, 4], 6: [0, 2, 1, 5, 3, 4], 7: [0, 2, 1, 6, 5, 3, 4], 8: [0, 2, 1, 7, 5, 6, 3, 4] };
 async function decode(src) {
   let buf = src instanceof Uint8Array ? src : new Uint8Array(src);
   let dec = await decoder();
@@ -2926,6 +2927,8 @@ async function decoder() {
     }
     if (!packets.length) return null;
     let decoded = codec2.decodePackets(packets);
+    let order = ORDER[decoded.channelData.length];
+    if (order) decoded.channelData = order.map((i) => decoded.channelData[i]);
     total2 += decoded.samplesDecoded;
     let page2 = pages2[pages2.length - 1];
     if (page2?.[isLastPage2]) {

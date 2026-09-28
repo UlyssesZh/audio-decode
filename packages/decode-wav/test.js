@@ -317,7 +317,8 @@ for (let name of ['ima_mono', 'ms_mono', 'ima_stereo', 'ms_stereo']) {
 		return b
 	}
 	let codes = { 8: [0, 255, 128, 127, 1], 16: [-32768, 32767, 0, -1, 1], 24: [-8388608, 8388607, 0, -1, 1], 32: [-2147483648, 2147483647, 0, -1, 1] }
-	let value = (bits, v) => { if (bits === 8) v -= 128; return v < 0 ? v / 2 ** (bits - 1) : v / (2 ** (bits - 1) - 1) }
+	// v / 2^(bits-1), as ffmpeg (libswresample s16 · 1/(1<<15)), libsndfile and Web Audio's decodeAudioData
+	let value = (bits, v) => { if (bits === 8) v -= 128; return v / 2 ** (bits - 1) }
 	let join = parts => parts[0].map((_, c) => { let x = new Float32Array(parts.reduce((n, p) => n + p[c].length, 0)), o = 0; for (let p of parts) { x.set(p[c], o); o += p[c].length } return x })
 	for (let [bits, float] of [[8, false], [16, false], [24, false], [32, false], [32, true], [64, true]]) {
 		let col = float ? [1, -1, 0.25, -0.5, 3] : codes[bits], n = col.length
