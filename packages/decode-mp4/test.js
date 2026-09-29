@@ -148,6 +148,16 @@ t('surround-opus.mp4: 5.1 Opus in SMPTE order: L R C LFE Ls Rs', async () => {
 	is(tones, [220, 330, 440, 0, 660, 770])
 })
 
+// Opus in ISOBMFF: the edit list's media_time covers dOps' PreSkip (312 here), its duration is the real length, as
+// ffprobe's duration_ts reads it (9600, 24000); the last packet's padding went through before (10248, 24648).
+// Onset: equal to ffmpeg's libopus decode (-c:a libopus) at lag 0, within an s16 LSB; here, the source's lag-0 SNR.
+t('Opus in MP4: the edit list trims PreSkip and the padding', async () => {
+	is((await decode(fx('surround-opus.mp4'))).channelData[0].length, 9600, 'surround-opus.mp4: 5.1, 0.2 s')
+	let r = await decode(fx('video-opus.mp4'))
+	is(r.channelData[0].length, 24000, 'video-opus.mp4: stereo, 0.5 s')
+	for (let c = 0; c < 2; c++) ok(snr(ref.channelData[c], r.channelData[c], 0) > 30, 'ch' + c + ' aligned: ' + snr(ref.channelData[c], r.channelData[c], 0).toFixed(1) + ' dB at lag 0')
+})
+
 t('rejects non-MP4 and empty input', async () => {
 	let err
 	try { await decode(new Uint8Array(100)) } catch (e) { err = e }

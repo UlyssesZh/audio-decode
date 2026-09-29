@@ -320,7 +320,7 @@ const DTS_TYPES = new Set(['dtsc', 'dtsh', 'dtsl', 'dtse']) // DTS-HD variants c
 
 async function createCodec({ entry, children, movie }) {
 	let { type } = entry
-	// AAC and ALAC trim the encoder's priming and padding by the track's edit list or iTunSMPB, MP3 by the edit list (gapless)
+	// AAC and ALAC trim the encoder's priming and padding by the track's edit list or iTunSMPB, MP3 and Opus by the edit list (gapless)
 	let boxes = { elst: children.elst, mdhd: children.mdhd, stts: children.stts, mvhd: movie?.mvhd, ilst: movie?.ilst ?? children.ilst }
 	if (type === 'mp4a') {
 		let { oti, dsi } = children.esds ? parseEsds(children.esds) : {}
@@ -345,7 +345,7 @@ async function createCodec({ entry, children, movie }) {
 	}
 	if (type === 'Opus') {
 		if (!children.dOps) throw Error('MP4 Opus track has no dOps box')
-		return opus(children.dOps)
+		return opus(children.dOps, boxes)
 	}
 	if (type === 'samr' || type === 'sawb') return amr(type === 'sawb')
 	if (type === 'ac-3') return frames(import('@audio/decode-ac3'))
@@ -403,20 +403,22 @@ async function frames(load) {
 // encoder and decoder delay (1105 for LAME, as ffmpeg writes it) and the padding. decode-aac reads the window.
 async function mp3(boxes) {
 	let [codec, { gapless }] = await Promise.all([frames(import('@audio/decode-mp3')), import('@audio/decode-aac')])
-	let g = gapless?.(boxes)
+	return windowed(codec, gapless?.(boxes))
+}
+
+// the edit list's window { start, duration } (seconds) over a codec that decodes from the media's first sample
+function windowed(codec, g) {
 	if (!g) return codec
 	let skip = null, left = null
-	return {
-		feed(frames) {
-			let r = codec.feed(frames), n = r.channelData?.[0]?.length
-			if (!n) return r
-			skip ??= Math.round(g.start * r.sampleRate); left ??= g.duration == null ? Infinity : Math.round(g.duration * r.sampleRate)
-			let a = Math.min(n, skip), b = Math.min(n, a + left)
-			skip -= a; left -= b - a
-			return b <= a ? EMPTY : a || b < n ? { ...r, channelData: r.channelData.map(c => c.subarray(a, b)) } : r
-		},
-		flush: codec.flush, free: codec.free
+	let cut = r => {
+		let n = r.channelData?.[0]?.length
+		if (!n) return r
+		skip ??= Math.round(g.start * r.sampleRate); left ??= g.duration == null ? Infinity : Math.round(g.duration * r.sampleRate)
+		let a = Math.min(n, skip), b = Math.min(n, a + left)
+		skip -= a; left -= b - a
+		return b <= a ? EMPTY : a || b < n ? { ...r, channelData: r.channelData.map(c => c.subarray(a, b)) } : r
 	}
+	return { feed: frames => cut(codec.feed(frames)), flush: () => cut(codec.flush()), free: codec.free }
 }
 
 async function flac(blocks) {
@@ -434,17 +436,20 @@ async function flac(blocks) {
 // as decode-opus reorders Ogg Opus: output channel j takes the coded channel of Vorbis position OPUS_ORDER[n][j]
 const OPUS_ORDER = { 3: [0, 2, 1], 5: [0, 2, 1, 3, 4], 6: [0, 2, 1, 5, 3, 4], 7: [0, 2, 1, 6, 5, 3, 4], 8: [0, 2, 1, 7, 5, 6, 3, 4] }
 
-async function opus(dOps) {
-	let channels = dOps[1]
-	let opts = { channels, sampleRate: 48000, preSkip: r16(dOps, 2), outputGain: (r16(dOps, 8) << 16) >> 16 }
+// Opus in ISOBMFF: the edit list's media_time covers PreSkip and its duration is the real length, so with an edit
+// list the window trims both ends from the media's first sample; without one, dOps' PreSkip trims the start
+async function opus(dOps, boxes) {
+	let [{ createOpusDecoder }, { gapless }] = await Promise.all([import('@audio/decode-opus/core'), import('@audio/decode-aac')])
+	let g = gapless?.(boxes), channels = dOps[1]
+	let opts = { channels, sampleRate: 48000, preSkip: g ? 0 : r16(dOps, 2), outputGain: (r16(dOps, 8) << 16) >> 16 }
 	if (dOps[10] > 0) {
 		opts.streamCount = dOps[11]; opts.coupledStreamCount = dOps[12]
 		let table = Array.from(dOps.subarray(13, 13 + channels))
 		opts.channelMappingTable = dOps[10] === 1 && OPUS_ORDER[channels] ? OPUS_ORDER[channels].map(i => table[i]) : table
 	}
-	let dec = await (await import('@audio/decode-opus/core')).createOpusDecoder()
+	let dec = await createOpusDecoder()
 	dec.configure(opts)
-	return {
+	return windowed({
 		feed: frames => {
 			let r = dec.decodeFrames(frames)
 			if (!r.samplesDecoded) return EMPTY
@@ -452,7 +457,7 @@ async function opus(dOps) {
 		},
 		flush: () => EMPTY,
 		free: () => dec.free()
-	}
+	}, g)
 }
 
 async function amr(wb) {
