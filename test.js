@@ -282,12 +282,17 @@ const workletPCM = {
 	webmVorbisBody: workletAudio(1, 432064, 44100),
 	webmVorbisTail: workletAudio(1, 110080, 44100),
 	aac: workletAudio(1, 542720, 44100),
-	m4a: workletAudio(2, 541696, 44100),
+	m4a: workletAudio(2, 541184, 44100), // gapless by its edit list: as long as the WAV
 	alac: workletAudio(1, 22050, 44100),
 	amrNb: workletAudio(1, 8000, 8000, false),
 	amrWb: workletAudio(1, 16000, 16000),
-	wmaMono: workletAudio(1, 45056, 44100),
-	wmaStereo: workletAudio(2, 45056, 44100),
+	wmaMono: workletAudio(1, 43008, 44100), // as ffmpeg decodes it
+	wmaStereo: workletAudio(2, 43008, 44100), // dual mono: two channels, as declared
+	// streamed, libavcodec holds its last frame (2048) till the flush
+	wmaMonoBody: workletAudio(1, 40960, 44100),
+	wmaMonoTail: workletAudio(1, 2048, 44100),
+	wmaStereoBody: workletAudio(2, 40960, 44100),
+	wmaStereoTail: workletAudio(2, 2048, 44100),
 	wav: workletAudio(1, 541184, 44100),
 	aiff: workletAudio(1, 542144, 44100),
 	caf: workletAudio(1, 541184, 44100),
@@ -414,12 +419,13 @@ t('audio worklet scope', async () => {
 	is(report.alac, [workletEmpty, workletEmpty, workletPCM.alac, workletEmpty], 'ALAC null → empty → M4A → flush')
 	is(report.amrNb, [workletEmpty, workletEmpty, workletPCM.amrNb, workletEmpty], 'AMR-NB null → empty → silent file → flush')
 	is(report.amrWb, [workletEmpty, workletEmpty, workletPCM.amrWb, workletEmpty], 'AMR-WB null → empty → file → flush')
-	is(report.wmaMono, [workletEmpty, workletEmpty, workletPCM.wmaMono, workletEmpty], 'WMA mono null → empty → file → flush')
-	is(report.wmaStereo, [workletEmpty, workletEmpty, workletPCM.wmaStereo, workletEmpty], 'WMA stereo null → empty → file → flush')
-	is(report.splits.opus, [workletPCM.opusBody, workletEmpty, workletPCM.opusTail], 'Opus split before final byte → flush tail')
+	is(report.wmaMono, [workletEmpty, workletEmpty, workletPCM.wmaMonoBody, workletPCM.wmaMonoTail], 'WMA mono null → empty → file → flush tail')
+	is(report.wmaStereo, [workletEmpty, workletEmpty, workletPCM.wmaStereoBody, workletPCM.wmaStereoTail], 'WMA stereo null → empty → file → flush tail')
+	// the page the cut falls in waits for its last byte: the pages before it, then it, then the tail
+	is(report.splits.opus, [workletAudio(1, 527688, 48000), workletAudio(1, 48000, 48000), workletPCM.opusTail], 'Opus split before final byte → last page → flush tail')
 	is(report.splits.aac, [workletAudio(1, 541696, 44100), workletAudio(1, 1024, 44100), workletEmpty], 'AAC split before final byte → final frame')
 	is(report.splits.amrNb, [workletAudio(1, 7840, 8000, false), workletAudio(1, 160, 8000, false), workletEmpty], 'AMR-NB split before final byte → final frame')
-	is(report.splits.wmaMono, [workletAudio(1, 32768, 44100), workletAudio(1, 12288, 44100), workletEmpty], 'WMA split before final byte → final packet')
+	is(report.splits.wmaMono, [workletAudio(1, 28672, 44100), workletAudio(1, 12288, 44100), workletPCM.wmaMonoTail], 'WMA split before final byte → final packet → flush tail')
 	let whole = {
 		flac: workletPCM.flacB,
 		vorbis: workletPCM.vorbisB,
@@ -736,6 +742,13 @@ t('mono mp3 decoded as 1 channel', async () => {
 t('stereo m4a decoded as 2 channels', async () => {
 	let r = await decode(m4a)
 	is(r.channelData.length, 2, 'stereo m4a returns 2 channels')
+})
+
+t('dual-mono wma keeps its declared 2 channels', async () => {
+	// libavcodec decodes WMA at its declared width: stereo.wma's identical channels stay two, as ffmpeg gives them
+	let r = await decode(wmaStereo)
+	is(r.channelData.length, 2, 'dual-mono wma stays stereo')
+	is(r.channelData[0].length, 43008, 'as ffmpeg decodes it')
 })
 
 t('dual-mono wav keeps its declared 2 channels', async () => {

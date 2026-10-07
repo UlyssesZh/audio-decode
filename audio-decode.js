@@ -124,8 +124,8 @@ function fmt(name, init) {
 
 // --- codecs ---
 // dedupe (3rd arg): decoder upmixes mono sources to duplicate stereo (verified for mp3;
-// aac/wma flagged conservatively — same lossy-wasm family). Exact containers never dedupe;
-// video containers that may carry AAC or MP3 (mp4/mov, mkv, avi) do.
+// aac flagged conservatively). Exact containers never dedupe, nor WMA (libavcodec keeps the
+// declared width); video containers that may carry AAC or MP3 (mp4/mov, mkv, avi) do.
 
 reg('mp3', () => import('@audio/decode-mp3'), true)
 reg('flac', () => import('@audio/decode-flac'))
@@ -150,7 +150,7 @@ reg('dts', () => import('@audio/decode-dts'))
 reg('amr', () => import('@audio/decode-amr'))
 // raw frames, no signature: by name only (decode.gsm(), decode(src, 'gsm'))
 reg('gsm', () => import('@audio/decode-gsm'))
-reg('wma', () => import('@audio/decode-wma'), true)
+reg('wma', () => import('@audio/decode-wma'))
 
 // lossless / audiophile long tail
 reg('wv', () => import('@audio/decode-wavpack'))
