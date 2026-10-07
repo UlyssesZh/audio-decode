@@ -967,3 +967,16 @@ t('long tail: tracker modules (mod / xm / s3m / it)', async () => {
 		is(r.channelData[0].length > 0, true, fmt + ' has frames')
 	}
 })
+
+t('gsm: raw frames by name, as the package decodes them, chunked or whole', async () => {
+	let bytes = await readFile(new URL('./packages/decode-gsm/fixtures/lena-2s.gsm', import.meta.url))
+	let whole = (await (await import('@audio/decode-gsm')).default(bytes)).channelData[0]
+	let dec = await decode.gsm(), parts = []
+	for (let i = 0; i < bytes.length; i += 100) parts.push((await dec(bytes.subarray(i, i + 100))).channelData[0] ?? new Float32Array(0))
+	parts.push((await dec()).channelData[0] ?? new Float32Array(0))
+	let y = new Float32Array(parts.reduce((s, p) => s + p.length, 0)), o = 0
+	for (let p of parts) { y.set(p, o); o += p.length }
+	is(y, whole, 'decode.gsm() in 100-byte chunks: the package\'s samples')
+	let r = await (async () => { let out = []; for await (let pcm of decode(new Blob([bytes]).stream(), 'gsm')) out.push(pcm); return out })()
+	is(r.reduce((s, p) => s + p.channelData[0].length, 0), 16000, "decode(stream, 'gsm'): 2 s at 8 kHz")
+})

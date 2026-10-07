@@ -35,6 +35,7 @@ const { channelData, sampleRate } = await decode(anyAudioBuffer);
 | E-AC-3 (Dolby Digital Plus, + AC-3) | [@audio/decode-eac3](./packages/decode-eac3) | 432 KB | WASM (FFmpeg libavcodec, LGPL) |
 | APE (Monkey's Audio) | [@audio/decode-ape](./packages/decode-ape) | 262 KB | WASM (FFmpeg libavcodec, LGPL) |
 | AMR | [@audio/decode-amr](./packages/decode-amr) | 241 KB | WASM |
+| GSM 06.10 (raw frames, by name) | [@audio/decode-gsm](./packages/decode-gsm) | 23 KB | WASM (libgsm) |
 | WMA (v1, v2, Pro, Lossless) | [@audio/decode-wma](./packages/decode-wma) | 463 KB | WASM (FFmpeg libavcodec, LGPL) |
 | WavPack | [@audio/decode-wavpack](./packages/decode-wavpack) | 51 KB | WASM |
 | TTA (True Audio) | [@audio/decode-tta](./packages/decode-tta) | 11 KB | JS |
@@ -76,7 +77,7 @@ for await (let { channelData, sampleRate } of decode.mp3(response.body)) {
 
 Works with `ReadableStream`, `fetch` body, Node stream, or any async iterable.
 
-Formats: `mp3`, `flac`, `opus`, `oga`, `m4a`, `mp4`, `mov`, `wav`, `qoa`, `aac`, `aiff`, `caf`, `webm`, `mkv`, `avi`, `ac3`, `dts`, `amr`, `wma`, `eac3`, `ape`, `wv`, `tta`, `mpc`, `dsf`, `dff`, `mod`, `xm`, `s3m`, `it`.
+Formats: `mp3`, `flac`, `opus`, `oga`, `m4a`, `mp4`, `mov`, `wav`, `qoa`, `aac`, `aiff`, `caf`, `webm`, `mkv`, `avi`, `ac3`, `dts`, `amr`, `gsm`, `wma`, `eac3`, `ape`, `wv`, `tta`, `mpc`, `dsf`, `dff`, `mod`, `xm`, `s3m`, `it`.
 
 ### Video files
 

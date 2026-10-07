@@ -148,6 +148,8 @@ reg('avi', () => import('@audio/decode-avi'), true)
 reg('ac3', () => import('@audio/decode-ac3'))
 reg('dts', () => import('@audio/decode-dts'))
 reg('amr', () => import('@audio/decode-amr'))
+// raw frames, no signature: by name only (decode.gsm(), decode(src, 'gsm'))
+reg('gsm', () => import('@audio/decode-gsm'))
 reg('wma', () => import('@audio/decode-wma'), true)
 
 // lossless / audiophile long tail
